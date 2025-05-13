@@ -2700,7 +2700,36 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             timeframe = signal.get('interval') or signal.get('timeframe')
                             context.user_data['signal_timeframe'] = timeframe
                             # Backup copies
-# Import necessary modules for improved logging
+                            context.user_data['signal_direction_backup'] = signal.get('direction')
+                            context.user_data['signal_timeframe_backup'] = timeframe
+            
+            # Show the signal analysis menu
+            keyboard = [
+                [InlineKeyboardButton("📈 Technical Analysis", callback_data="signal_technical")],
+                [InlineKeyboardButton("🧠 Market Sentiment", callback_data="signal_sentiment")],
+                [InlineKeyboardButton("📅 Economic Calendar", callback_data="signal_calendar")],
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_signal")]
+            ]
+            
+            await query.edit_message_text(
+                text=f"<b>🔍 Analysis for {instrument}</b>\n\nChoose analysis type:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.HTML
+            )
+            
+            return CHOOSE_ANALYSIS
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
+            # Error handling - show a message and return to menu
+            try:
+                await query.edit_message_text(
+                    text=f"Error analyzing signal: {str(e)}. Please try again.",
+                    reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
+                )
+            except Exception:
+                pass
+            return MENU
 import os
 import sys
 import json
