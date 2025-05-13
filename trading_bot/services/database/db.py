@@ -746,35 +746,39 @@ class Database:
                 return []
             
             # Default implementation for other tables
-            result = self.supabase.table('subscriber_preferences').select('*').execute()
-            
-            # Log het resultaat
-            logger.info(f"Raw query result: {result.data}")
-            
-            # Als de query een filter op market, instrument en timeframe bevat, filter dan handmatig
-            if 'market' in query and 'instrument' in query and 'timeframe' in query:
-                # Extraheer de waarden (eenvoudige implementatie)
-                market_match = re.search(r"market\s*=\s*'([^']*)'", query)
-                instrument_match = re.search(r"instrument\s*=\s*'([^']*)'", query)
-                timeframe_match = re.search(r"timeframe\s*=\s*'([^']*)'", query)
+            if hasattr(self, 'supabase') and self.supabase:
+                result = self.supabase.table('subscriber_preferences').select('*').execute()
                 
-                if market_match and instrument_match and timeframe_match:
-                    market = market_match.group(1)
-                    instrument = instrument_match.group(1)
-                    timeframe = timeframe_match.group(1)
+                # Log het resultaat
+                logger.info(f"Raw query result: {result.data}")
+                
+                # Als de query een filter op market, instrument en timeframe bevat, filter dan handmatig
+                if 'market' in query and 'instrument' in query and 'timeframe' in query:
+                    # Extraheer de waarden (eenvoudige implementatie)
+                    market_match = re.search(r"market\s*=\s*'([^']*)'", query)
+                    instrument_match = re.search(r"instrument\s*=\s*'([^']*)'", query)
+                    timeframe_match = re.search(r"timeframe\s*=\s*'([^']*)'", query)
                     
-                    # Filter handmatig
-                    filtered_result = [
-                        item for item in result.data
-                        if item.get('market') == market and 
-                           item.get('instrument') == instrument and 
-                           item.get('timeframe') == timeframe
-                    ]
-                    
-                    logger.info(f"Filtered result: {filtered_result}")
-                    return filtered_result
-            
-            return result.data
+                    if market_match and instrument_match and timeframe_match:
+                        market = market_match.group(1)
+                        instrument = instrument_match.group(1)
+                        timeframe = timeframe_match.group(1)
+                        
+                        # Filter handmatig
+                        filtered_result = [
+                            item for item in result.data
+                            if item.get('market') == market and 
+                               item.get('instrument') == instrument and 
+                               item.get('timeframe') == timeframe
+                        ]
+                        
+                        logger.info(f"Filtered result: {filtered_result}")
+                        return filtered_result
+                
+                return result.data
+            else:
+                logger.warning("Supabase client not available")
+                return []
         except Exception as e:
             logger.error(f"Error executing query: {str(e)}")
             logger.exception(e)
@@ -1478,7 +1482,7 @@ class Database:
             # Check Supabase if available
             if hasattr(self, 'supabase') and self.supabase:
                 try:
-                    result = self.execute_query(
+                    result = await self.execute_query(
                         "SELECT * FROM signals WHERE id = %s AND user_id = %s",
                         [signal_id, user_id]
                     )
@@ -1542,12 +1546,12 @@ class Database:
             elif hasattr(self, 'supabase') and self.supabase:
                 try:
                     if instrument:
-                        result = self.execute_query(
+                        result = await self.execute_query(
                             "SELECT * FROM signals WHERE user_id = %s AND instrument = %s ORDER BY timestamp DESC",
                             [user_id, instrument]
                         )
                     else:
-                        result = self.execute_query(
+                        result = await self.execute_query(
                             "SELECT * FROM signals WHERE user_id = %s ORDER BY timestamp DESC",
                             [user_id]
                         )
@@ -1644,7 +1648,7 @@ class Database:
             elif hasattr(self, 'supabase') and self.supabase:
                 try:
                     # Get signals from the last 7 days
-                    result = self.execute_query(
+                    result = await self.execute_query(
                         "SELECT * FROM signals WHERE timestamp > NOW() - INTERVAL '7 days' ORDER BY timestamp DESC",
                         []  # Empty params array to match the new execute_query signature
                     )

@@ -154,6 +154,10 @@ async def receive_signal(request: Request):
         # Log the parsed data
         logger.info(f"Signal data: {data}")
         
+        # Log the webhook URL being used
+        webhook_url = os.environ.get("WEBHOOK_URL", "https://sigmapips-27-production.up.railway.app")
+        logger.info(f"Processing signal using webhook URL: {webhook_url}")
+        
         # Import the TelegramService dynamically to avoid circular imports
         try:
             from trading_bot.main import TelegramService
@@ -167,8 +171,10 @@ async def receive_signal(request: Request):
             result = await telegram_service.process_signal(data)
             
             if result:
+                logger.info(f"Signal processed successfully via webhook URL: {webhook_url}")
                 return {"status": "success", "message": "Signal processed successfully"}
             else:
+                logger.error(f"Failed to process signal via webhook URL: {webhook_url}")
                 return {"status": "error", "message": "Failed to process signal"}
                 
         except ImportError as ie:

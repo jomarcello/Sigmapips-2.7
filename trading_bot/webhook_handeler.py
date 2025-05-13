@@ -14,15 +14,114 @@ import httpx
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class SignalHandler:
+    """Handler for trading signals"""
+    
+    def __init__(self):
+        """Initialize the signal handler"""
+        self.logger = logging.getLogger(__name__)
+    
+    def format_signal(self, signal_data):
+        """Format a trading signal for display in Telegram"""
+        try:
+            # Extract signal data with defaults
+            instrument = signal_data.get("instrument", "Unknown")
+            direction = signal_data.get("direction", "Unknown").upper()
+            entry_price = signal_data.get("entry_price")
+            stop_loss = signal_data.get("stop_loss")
+            take_profit = signal_data.get("take_profit", [])
+            timeframe = signal_data.get("timeframe", "Unknown")
+            strategy = signal_data.get("strategy", "Unknown")
+            risk_reward = signal_data.get("risk_reward", 0)
+            risk_percentage = signal_data.get("risk_percentage", 1)
+            ai_verdict = signal_data.get("ai_verdict", "No AI analysis available")
+            
+            # Validate required fields
+            if not all([instrument, direction, entry_price, stop_loss]):
+                raise ValueError("Missing required signal data")
+                
+            # Ensure take_profit is a list
+            if not isinstance(take_profit, list):
+                take_profit = [take_profit]
+                
+            # Format the signal message
+            if direction == "BUY":
+                signal_emoji = "🟢"
+                # For BUY signals, take profits should be above entry price in ascending order
+                take_profit = sorted(take_profit)
+            elif direction == "SELL":
+                signal_emoji = "🔴"
+                # For SELL signals, take profits should be below entry price in descending order
+                take_profit = sorted(take_profit, reverse=True)
+            else:
+                signal_emoji = "⚪"
+            
+            # Format prices with appropriate precision
+            def format_price(price):
+                if instrument.endswith("JPY"):
+                    return f"{price:.3f}"
+                return f"{price:.5f}"
+            
+            # Build the signal message
+            message = f"{signal_emoji} *{instrument} {direction} SIGNAL* {signal_emoji}\n\n"
+            
+            # Entry and SL
+            message += f"*Entry Price:* {format_price(entry_price)}\n"
+            message += f"*Stop Loss:* {format_price(stop_loss)}\n\n"
+            
+            # Take profit levels
+            message += "*Take Profit Levels:*\n"
+            for i, tp in enumerate(take_profit, 1):
+                message += f"TP{i}: {format_price(tp)}\n"
+            
+            # Additional info
+            message += f"\n*Timeframe:* {timeframe}\n"
+            message += f"*Strategy:* {strategy}\n"
+            message += f"*Risk/Reward:* {risk_reward:.1f}\n"
+            message += f"*Risk %:* {risk_percentage:.1f}%\n\n"
+            
+            # AI analysis
+            message += f"*AI Analysis:*\n{ai_verdict}\n\n"
+            
+            # Risk management reminder
+            message += "⚠️ *Risk Management:* Always use proper position sizing and risk management."
+            
+            return message
+            
+        except Exception as e:
+            self.logger.error(f"Error formatting signal: {str(e)}")
+            raise
+    
+    async def process_signal(self, signal_data):
+        """Process a trading signal"""
+        try:
+            # Format the signal for display
+            formatted_signal = self.format_signal(signal_data)
+            
+            # Here you would typically send the formatted signal to users
+            # For now, we'll just return it
+            return {
+                "status": "success",
+                "formatted_signal": formatted_signal
+            }
+        except Exception as e:
+            self.logger.error(f"Error processing signal: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
 class WebhookHandler:
     """Handler for Telegram webhooks"""
     
     def __init__(self):
         """Initialize the webhook handler"""
         self.logger = logging.getLogger(__name__)
-        # Get the base URL for internal communication
-        self.base_url = os.environ.get("INTERNAL_API_URL", "http://localhost:8000")
+        # Get the base URL for internal communication, default to the new production URL
+        self.base_url = os.environ.get("INTERNAL_API_URL", "https://sigmapips-27-production.up.railway.app")
         self.logger.info(f"Using internal API URL: {self.base_url}")
+        # Initialize the signal handler
+        self.signal_handler = SignalHandler()
     
     async def handle_webhook(self, request: Request):
         """Handle a webhook request"""
@@ -64,33 +163,11 @@ class WebhookHandler:
             # Log the parsed data
             self.logger.info(f"Signal data: {data}")
             
-            # Forward to the main signal endpoint
-            try:
-                # Use the internal API URL to forward to the /signal endpoint
-                signal_url = f"{self.base_url}/signal"
-                self.logger.info(f"Forwarding signal to: {signal_url}")
-                
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        signal_url,
-                        json=data,
-                        timeout=30.0
-                    )
-                    
-                    # Log the response
-                    self.logger.info(f"Signal forwarding response: {response.status_code}")
-                    
-                    # Return the response from the signal endpoint
-                    return JSONResponse(
-                        content=response.json(),
-                        status_code=response.status_code
-                    )
-            except Exception as forward_error:
-                self.logger.error(f"Error forwarding signal: {str(forward_error)}")
-                return JSONResponse(
-                    content={"status": "error", "message": f"Error forwarding signal: {str(forward_error)}"},
-                    status_code=500
-                )
+            # Process the signal
+            result = await self.signal_handler.process_signal(data)
+            
+            # Return the result
+            return JSONResponse(content=result, status_code=200 if result["status"] == "success" else 400)
             
         except Exception as e:
             self.logger.error(f"Error processing signal webhook: {str(e)}")
