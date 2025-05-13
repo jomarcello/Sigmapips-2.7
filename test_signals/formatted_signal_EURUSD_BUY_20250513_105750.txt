@@ -1,0 +1,25 @@
+🎯 New Trading Signal 🎯
+
+Instrument: EURUSD
+Action: BUY 🟢
+
+Entry Price: 1.0850
+Stop Loss: 1.0800 🔴
+Take Profit 1: 1.0900 🎯
+Take Profit 2: 1.093 🎯
+Take Profit 3: 1.095 🎯
+
+Timeframe: 15
+Strategy: TradingView Signal
+
+————————————————————
+
+Risk Management:
+• Position size: 1-2% max
+• Use proper stop loss
+• Follow your trading plan
+
+————————————————————
+
+🤖 SigmaPips AI Verdict:
+The EURUSD buy signal shows a promising setup with defined entry at 1.0850 and stop loss at 1.0800. Multiple take profit levels provide opportunities for partial profit taking.

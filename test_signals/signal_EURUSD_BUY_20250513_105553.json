@@ -1,0 +1,15 @@
+{
+  "instrument": "EURUSD",
+  "direction": "BUY",
+  "entry": "1.0850",
+  "stop_loss": "1.0800",
+  "take_profit": "1.0900",
+  "timeframe": "15",
+  "interval": "15",
+  "price": "1.0850",
+  "sl": "1.0800",
+  "timestamp": "2025-05-13T10:55:53.261744",
+  "tp1": "1.0900",
+  "tp2": "1.093",
+  "tp3": "1.095"
+}

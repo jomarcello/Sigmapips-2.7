@@ -1,0 +1,25 @@
+🎯 New Trading Signal 🎯
+
+Instrument: USDJPY
+Action: SELL 🔴
+
+Entry Price: 141.994
+Stop Loss: 142.054 🔴
+Take Profit 1: 143.282 🎯
+Take Profit 2: 141.64 🎯
+Take Profit 3: 148.284 🎯
+
+Timeframe: 15
+Strategy: TradingView Signal
+
+————————————————————
+
+Risk Management:
+• Position size: 1-2% max
+• Use proper stop loss
+• Follow your trading plan
+
+————————————————————
+
+🤖 SigmaPips AI Verdict:
+The USDJPY sell signal shows a promising setup with defined entry at 141.994 and stop loss at 142.054. Multiple take profit levels provide opportunities for partial profit taking.

@@ -1,0 +1,15 @@
+{
+  "instrument": "USDJPY",
+  "direction": "SELL",
+  "entry": "141.994",
+  "stop_loss": "142.054",
+  "take_profit": "143.282",
+  "timeframe": "15",
+  "interval": "15",
+  "price": "141.994",
+  "sl": "142.054",
+  "timestamp": "2025-05-13T10:52:05.416345",
+  "tp1": "143.282",
+  "tp2": "141.64",
+  "tp3": "148.284"
+}

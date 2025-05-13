@@ -9,7 +9,7 @@ import logging
 import platform
 import psutil
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import importlib.util
 
@@ -130,3 +130,54 @@ async def health_check():
 async def ping():
     """Simple ping endpoint for quick testing"""
     return {"ping": "pong", "timestamp": datetime.now().isoformat()} 
+
+@app.post("/signal")
+async def receive_signal(request: Request):
+    """
+    Endpoint for receiving trading signals from external sources
+    
+    This endpoint processes incoming trading signals and forwards them to the bot
+    for distribution to subscribers.
+    """
+    try:
+        # Log the incoming request
+        body = await request.body()
+        logger.info(f"Received signal payload: {body.decode('utf-8')[:200]}...")
+        
+        # Parse JSON data
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in signal request body")
+            return {"status": "error", "message": "Invalid JSON"}
+        
+        # Log the parsed data
+        logger.info(f"Signal data: {data}")
+        
+        # Import the TelegramService dynamically to avoid circular imports
+        try:
+            from trading_bot.main import TelegramService
+            from trading_bot.services.database.db import Database
+            
+            # Get the bot instance
+            db = Database()
+            telegram_service = TelegramService(db=db)
+            
+            # Process the signal
+            result = await telegram_service.process_signal(data)
+            
+            if result:
+                return {"status": "success", "message": "Signal processed successfully"}
+            else:
+                return {"status": "error", "message": "Failed to process signal"}
+                
+        except ImportError as ie:
+            logger.error(f"Import error in signal endpoint: {str(ie)}")
+            return {"status": "error", "message": "Internal service error"}
+        except Exception as e:
+            logger.error(f"Error processing signal: {str(e)}")
+            return {"status": "error", "message": str(e)}
+            
+    except Exception as e:
+        logger.error(f"Error in signal endpoint: {str(e)}")
+        return {"status": "error", "message": str(e)} 
