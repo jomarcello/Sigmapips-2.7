@@ -2625,61 +2625,21 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     if signal_id:
                         context.user_data['signal_id'] = signal_id
                     
-                    # Set signal flow flags
-                    context.user_data['from_signal'] = True
-                    context.user_data['in_signal_flow'] = True
-                    logger.info(f"Set signal flow flags: from_signal=True, in_signal_flow=True")
-                    
                     # Make a backup copy to ensure we can return to signal later
                     context.user_data['signal_instrument_backup'] = instrument
                     if signal_id:
                         context.user_data['signal_id_backup'] = signal_id
                     
                     # Also store info from the actual signal if available
-                    user_id = update.effective_user.id
-                    user_str_id = str(user_id)
-                    
-                    if hasattr(self, 'user_signals') and user_str_id in self.user_signals and signal_id in self.user_signals[user_str_id]:
-                        signal = self.user_signals[user_str_id][signal_id]
+                    if str(update.effective_user.id) in self.user_signals and signal_id in self.user_signals[str(update.effective_user.id)]:
+                        signal = self.user_signals[str(update.effective_user.id)][signal_id]
                         if signal:
-                            # Store all relevant signal information
                             context.user_data['signal_direction'] = signal.get('direction')
-                            # Use interval or timeframe, whichever is available
-                            timeframe = signal.get('interval') or signal.get('timeframe')
-                            context.user_data['signal_timeframe'] = timeframe
+                            context.user_data['signal_timeframe'] = signal.get('interval')
                             # Backup copies
-                            context.user_data['signal_timeframe_backup'] = timeframe
                             context.user_data['signal_direction_backup'] = signal.get('direction')
-                            # Store the full signal data for later use
-                            context.user_data['current_signal_data'] = signal
-                            logger.info(f"Stored signal details: direction={signal.get('direction')}, timeframe={timeframe}")
-                    elif signal_id and hasattr(self, 'db') and self.db:
-                        # Try to fetch from database if not in memory
-                        try:
-                            logger.info(f"Signal {signal_id} not found in memory, trying to fetch from database")
-                            signal = await self.db.get_signal_by_id(signal_id)
-                            if signal:
-                                # Store all relevant signal information
-                                context.user_data['signal_direction'] = signal.get('direction')
-                                # Use interval or timeframe, whichever is available
-                                timeframe = signal.get('interval') or signal.get('timeframe')
-                                context.user_data['signal_timeframe'] = timeframe
-                                # Backup copies
-                                context.user_data['signal_timeframe_backup'] = timeframe
-                                context.user_data['signal_direction_backup'] = signal.get('direction')
-                                # Store the full signal data for later use
-                                context.user_data['current_signal_data'] = signal
-                                
-                                # Also add to memory cache
-                                if not hasattr(self, 'user_signals'):
-                                    self.user_signals = {}
-                                if user_str_id not in self.user_signals:
-                                    self.user_signals[user_str_id] = {}
-                                self.user_signals[user_str_id][signal_id] = signal
-                                
-                                logger.info(f"Retrieved and stored signal {signal_id} from database")
-                        except Exception as db_error:
-                            logger.error(f"Error retrieving signal from database: {str(db_error)}")
+                            context.user_data['signal_timeframe_backup'] = signal.get('interval')
+                            logger.info(f"Stored signal details: direction={signal.get('direction')}, timeframe={signal.get('interval')}")
             else:
                 # Legacy support - just extract the instrument
                 instrument = parts[3] if len(parts) >= 4 else None
@@ -2687,9 +2647,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 if instrument and context and hasattr(context, 'user_data'):
                     context.user_data['instrument'] = instrument
                     context.user_data['signal_instrument_backup'] = instrument
-                    # Set signal flow flags even for legacy format
-                    context.user_data['from_signal'] = True
-                    context.user_data['in_signal_flow'] = True
             
             # Show analysis options for this instrument
             # Format message
@@ -2869,6 +2826,58 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             logger.error(f"Error in button_callback: {str(e)}")
             logger.exception(e)
             return MENU
+
+    async def market_signals_callback(self, update: Update, context=None) -> int:
+        """Handle signals market selection"""
+        query = update.callback_query
+        await query.answer()
+        
+        # Set the signal context flag
+        if context and hasattr(context, 'user_data'):
+            context.user_data['is_signals_context'] = True
+        
+        # Get the signals GIF URL
+        gif_url = await get_signals_gif()
+        
+        # Update the message with the GIF and keyboard
+        success = await gif_utils.update_message_with_gif(
+            query=query,
+            gif_url=gif_url,
+            text="Select a market for trading signals:",
+            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
+        )
+        
+        if not success:
+            # If the helper function failed, try a direct approach as fallback
+            try:
+                # First try to edit message text
+                await query.edit_message_text(
+                    text="Select a market for trading signals:",
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
+                )
+            except Exception as text_error:
+                # If that fails due to caption, try editing caption
+                if "There is no text in the message to edit" in str(text_error):
+                    try:
+                        await query.edit_message_caption(
+                            caption="Select a market for trading signals:",
+                            parse_mode=ParseMode.HTML,
+                            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to update caption in market_signals_callback: {str(e)}")
+                        # Try to send a new message as last resort
+                        await query.message.reply_text(
+                            text="Select a market for trading signals:",
+                            parse_mode=ParseMode.HTML,
+                            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
+                        )
+                else:
+                    # Re-raise for other errors
+                    raise
+                    
+        return CHOOSE_MARKET
         
     async def market_callback(self, update: Update, context=None) -> int:
         """Handle market selection and show appropriate instruments"""
@@ -3302,8 +3311,8 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         # Try to edit caption as last resort
                         try:
                             await query.edit_message_caption(caption=loading_text)
-                        except Exception as e:
-                            logger.error(f"Failed to update caption: {str(e)}")
+                        except Exception as caption_error:
+                            logger.error(f"Failed to update caption: {str(caption_error)}")
             
             # Initialize the chart service if needed
             if not hasattr(self, 'chart_service') or not self.chart_service:
@@ -4220,6 +4229,440 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 pass
             
             return CHOOSE_SIGNALS
+
+    async def handle_subscription_callback(self, update: Update, context=None) -> int:
+        """Handle subscription button press"""
+        query = update.callback_query
+        await query.answer()
+        
+        # Check if we have Stripe service configured
+        if not self.stripe_service:
+            logger.error("Stripe service not configured")
+            await query.edit_message_text(
+                text="Sorry, subscription service is not available right now. Please try again later.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back_menu")]])
+            )
+            return MENU
+        
+        # Get the subscription URL
+        subscription_url = "https://buy.stripe.com/3cs3eF9Hu9256NW9AA"  # 14-day free trial URL
+        features = get_subscription_features()
+        
+        # Format the subscription message
+        message = f"""
+🚀 <b>Welcome to Sigmapips AI!</b> 🚀
+
+<b>Discover powerful trading signals for various markets:</b>
+• <b>Forex</b> - Major and minor currency pairs
+• <b>Crypto</b> - Bitcoin, Ethereum and other top cryptocurrencies
+• <b>Indices</b> - Global market indices
+• <b>Commodities</b> - Gold, silver and oil
+
+<b>Features:</b>
+✅ Real-time trading signals
+✅ Multi-timeframe analysis (1m, 15m, 1h, 4h)
+✅ Advanced chart analysis
+✅ Sentiment indicators
+✅ Economic calendar integration
+
+<b>Start today with a FREE 14-day trial!</b>
+"""
+        
+        # Create keyboard with subscription button
+        keyboard = [
+            [InlineKeyboardButton("🔥 Start 14-day FREE Trial", url=subscription_url)],
+            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
+        ]
+        
+        # Update message with subscription information
+        try:
+            # Get a welcome GIF URL
+            gif_url = await get_welcome_gif()
+            
+            # Update the message with the GIF using the helper function
+            success = await gif_utils.update_message_with_gif(
+                query=query,
+                gif_url=gif_url,
+                text=message,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+            if not success:
+                # If the helper function failed, try a direct approach as fallback
+                try:
+                    await query.edit_message_text(
+                        text=message,
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception as text_error:
+                    # If that fails due to caption, try editing caption
+                    if "There is no text in the message to edit" in str(text_error):
+                        await query.edit_message_caption(
+                            caption=message,
+                            reply_markup=InlineKeyboardMarkup(keyboard),
+                            parse_mode=ParseMode.HTML
+                        )
+        except Exception as e:
+            logger.error(f"Error updating message with subscription info: {str(e)}")
+            # Try to send a new message as fallback
+            await query.message.reply_text(
+                text=message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.HTML
+            )
+        
+        return SUBSCRIBE
+        
+    async def get_subscribers_for_instrument(self, instrument: str, timeframe: str = None) -> List[int]:
+        """
+        Get a list of subscribed user IDs for a specific instrument and timeframe
+        
+        Args:
+            instrument: The trading instrument (e.g., EURUSD)
+            timeframe: Optional timeframe filter
+            
+        Returns:
+            List of subscribed user IDs
+        """
+        try:
+            logger.info(f"Getting subscribers for {instrument} timeframe: {timeframe}")
+            
+            # Get all subscribers from the database
+            # Note: Using get_signal_subscriptions instead of find_all
+            subscribers = await self.db.get_signal_subscriptions(instrument, timeframe)
+            
+            if not subscribers:
+                logger.warning(f"No subscribers found for {instrument}")
+                return []
+                
+            # Filter out subscribers that don't have an active subscription
+            active_subscribers = []
+            for subscriber in subscribers:
+                user_id = subscriber['user_id']
+                
+                # Check if user is subscribed
+                is_subscribed = await self.db.is_user_subscribed(user_id)
+                
+                # Check if payment has failed
+                payment_failed = await self.db.has_payment_failed(user_id)
+                
+                if is_subscribed and not payment_failed:
+                    active_subscribers.append(user_id)
+                else:
+                    logger.info(f"User {user_id} doesn't have an active subscription, skipping signal")
+            
+            return active_subscribers
+            
+        except Exception as e:
+            logger.error(f"Error getting subscribers: {str(e)}")
+            # FOR TESTING: Add admin users if available
+            if hasattr(self, 'admin_users') and self.admin_users:
+                logger.info(f"Returning admin users for testing: {self.admin_users}")
+                return self.admin_users
+            return []
+
+    async def process_signal(self, signal_data: Dict[str, Any]) -> bool:
+        """
+        Process a trading signal from TradingView webhook or API
+        
+        Supports two formats:
+        1. TradingView format: instrument, signal, price, sl, tp1, tp2, tp3, interval
+        2. Custom format: instrument, direction, entry, stop_loss, take_profit, timeframe
+        
+        Returns:
+            bool: True if signal was processed successfully, False otherwise
+        """
+        try:
+            # Log the incoming signal data
+            logger.info(f"Processing signal: {signal_data}")
+            
+            # Check which format we're dealing with and normalize it
+            instrument = signal_data.get('instrument')
+            
+            # Handle TradingView format (price, sl, interval)
+            if 'price' in signal_data and 'sl' in signal_data:
+                price = signal_data.get('price')
+                sl = signal_data.get('sl')
+                tp1 = signal_data.get('tp1')
+                tp2 = signal_data.get('tp2')
+                tp3 = signal_data.get('tp3')
+                interval = signal_data.get('interval', '1h')
+                
+                # Determine signal direction based on price and SL relationship
+                direction = "BUY" if float(sl) < float(price) else "SELL"
+                
+                # Create normalized signal data
+                normalized_data = {
+                    'instrument': instrument,
+                    'direction': direction,
+                    'entry': price,
+                    'stop_loss': sl,
+                    'take_profit': tp1,  # Use first take profit level
+                    'timeframe': interval
+                }
+                
+                # Add optional fields if present
+                normalized_data['tp1'] = tp1
+                normalized_data['tp2'] = tp2
+                normalized_data['tp3'] = tp3
+            
+            # Handle custom format (direction, entry, stop_loss, timeframe)
+            elif 'direction' in signal_data and 'entry' in signal_data:
+                direction = signal_data.get('direction')
+                entry = signal_data.get('entry')
+                stop_loss = signal_data.get('stop_loss')
+                take_profit = signal_data.get('take_profit')
+                timeframe = signal_data.get('timeframe', '1h')
+                
+                # Create normalized signal data
+                normalized_data = {
+                    'instrument': instrument,
+                    'direction': direction,
+                    'entry': entry,
+                    'stop_loss': stop_loss,
+                    'take_profit': take_profit,
+                    'timeframe': timeframe
+                }
+            else:
+                logger.error(f"Missing required signal data")
+                return False
+            
+            # Basic validation
+            if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
+                logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
+                return False
+                
+            # Create signal ID for tracking
+            signal_id = f"{normalized_data['instrument']}_{normalized_data['direction']}_{normalized_data['timeframe']}_{int(time.time())}"
+            
+            # Format the signal message
+            message = self._format_signal_message(normalized_data)
+            
+            # Determine market type for the instrument
+            market_type = _detect_market(instrument)
+            
+            # Store the full signal data for reference
+            normalized_data['id'] = signal_id
+            normalized_data['timestamp'] = datetime.now().isoformat()
+            normalized_data['message'] = message
+            normalized_data['market'] = market_type
+            
+            # Save signal for history tracking
+            if not os.path.exists(self.signals_dir):
+                os.makedirs(self.signals_dir, exist_ok=True)
+                
+            # Save to signals directory
+            with open(f"{self.signals_dir}/{signal_id}.json", 'w') as f:
+                json.dump(normalized_data, f)
+            
+            # FOR TESTING: Always send to admin for testing
+            if hasattr(self, 'admin_users') and self.admin_users:
+                try:
+                    logger.info(f"Sending signal to admin users for testing: {self.admin_users}")
+                    for admin_id in self.admin_users:
+                        # Prepare keyboard with analysis options
+                        keyboard = [
+                            [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
+                        ]
+                        
+                        # Send the signal
+                        await self.bot.send_message(
+                            chat_id=admin_id,
+                            text=message,
+                            parse_mode=ParseMode.HTML,
+                            reply_markup=InlineKeyboardMarkup(keyboard)
+                        )
+                        logger.info(f"Test signal sent to admin {admin_id}")
+                        
+                        # Store signal reference for quick access
+                        if not hasattr(self, 'user_signals'):
+                            self.user_signals = {}
+                            
+                        admin_str_id = str(admin_id)
+                        if admin_str_id not in self.user_signals:
+                            self.user_signals[admin_str_id] = {}
+                        
+                        self.user_signals[admin_str_id][signal_id] = normalized_data
+                except Exception as e:
+                    logger.error(f"Error sending test signal to admin: {str(e)}")
+            
+            # Get subscribers for this instrument
+            timeframe = normalized_data.get('timeframe', '1h')
+            subscribers = await self.get_subscribers_for_instrument(instrument, timeframe)
+            
+            if not subscribers:
+                logger.warning(f"No subscribers found for {instrument}")
+                return True  # Successfully processed, just no subscribers
+            
+            # Send signal to all subscribers
+            logger.info(f"Sending signal {signal_id} to {len(subscribers)} subscribers")
+            
+            sent_count = 0
+            for user_id in subscribers:
+                try:
+                    # Prepare keyboard with analysis options
+                    keyboard = [
+                        [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
+                    ]
+                    
+                    # Send the signal
+                    await self.bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+                    
+                    sent_count += 1
+                    
+                    # Store signal reference for quick access
+                    if not hasattr(self, 'user_signals'):
+                        self.user_signals = {}
+                        
+                    user_str_id = str(user_id)
+                    if user_str_id not in self.user_signals:
+                        self.user_signals[user_str_id] = {}
+                    
+                    self.user_signals[user_str_id][signal_id] = normalized_data
+                    
+                except Exception as e:
+                    logger.error(f"Error sending signal to user {user_id}: {str(e)}")
+            
+            logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error processing signal: {str(e)}")
+            logger.exception(e)
+            return False
+
+    def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
+        """Format signal data into a nice message for Telegram"""
+        try:
+            # Extract fields from signal data
+            instrument = signal_data.get('instrument', 'Unknown')
+            direction = signal_data.get('direction', 'Unknown')
+            entry = signal_data.get('entry', 'Unknown')
+            stop_loss = signal_data.get('stop_loss')
+            take_profit = signal_data.get('take_profit')
+            timeframe = signal_data.get('timeframe', '1h')
+            
+            # Get multiple take profit levels if available
+            tp1 = signal_data.get('tp1', take_profit)
+            tp2 = signal_data.get('tp2')
+            tp3 = signal_data.get('tp3')
+            
+            # Add emoji based on direction
+            direction_emoji = "🟢" if direction.upper() == "BUY" else "🔴"
+            
+            # Format the message with multiple take profits if available
+            message = f"<b>🎯 New Trading Signal 🎯</b>\n\n"
+            message += f"<b>Instrument:</b> {instrument}\n"
+            message += f"<b>Action:</b> {direction.upper()} {direction_emoji}\n\n"
+            message += f"<b>Entry Price:</b> {entry}\n"
+            
+            if stop_loss:
+                message += f"<b>Stop Loss:</b> {stop_loss} 🔴\n"
+            
+            # Add take profit levels
+            if tp1:
+                message += f"<b>Take Profit 1:</b> {tp1} 🎯\n"
+            if tp2:
+                message += f"<b>Take Profit 2:</b> {tp2} 🎯\n"
+            if tp3:
+                message += f"<b>Take Profit 3:</b> {tp3} 🎯\n"
+            
+            message += f"\n<b>Timeframe:</b> {timeframe}\n"
+            message += f"<b>Strategy:</b> TradingView Signal\n\n"
+            
+            message += "————————————————————\n\n"
+            message += "<b>Risk Management:</b>\n"
+            message += "• Position size: 1-2% max\n"
+            message += "• Use proper stop loss\n"
+            message += "• Follow your trading plan\n\n"
+            
+            message += "————————————————————\n\n"
+            
+            # Generate AI verdict
+            ai_verdict = f"The {instrument} {direction.lower()} signal shows a promising setup with defined entry at {entry} and stop loss at {stop_loss}. Multiple take profit levels provide opportunities for partial profit taking."
+            message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
+            
+            return message
+            
+        except Exception as e:
+            logger.error(f"Error formatting signal message: {str(e)}")
+            # Return simple message on error
+            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
+
+    async def _load_signals(self):
+        """Load stored signals from the database"""
+        try:
+            self.logger.info("Loading stored signals")
+            
+            try:
+                # Check if the get_active_signals method exists on the database object
+                if hasattr(self.db, 'get_active_signals'):
+                    signals = await self.db.get_active_signals()
+                    self.logger.info(f"Found {len(signals)} active signals")
+                    
+                    # Process each signal
+                    for signal in signals:
+                        # Check necessary fields
+                        if 'user_id' in signal and 'market' in signal and 'instrument' in signal:
+                            user_id = signal['user_id']
+                            market = signal['market']
+                            instrument = signal['instrument']
+                            
+                            # Add to user_signals dictionary
+                            if user_id not in self.user_signals:
+                                self.user_signals[user_id] = {}
+                            if market not in self.user_signals[user_id]:
+                                self.user_signals[user_id][market] = []
+                            
+                            # Add instrument if not already in list
+                            if instrument not in self.user_signals[user_id][market]:
+                                self.user_signals[user_id][market].append(instrument)
+                else:
+                    self.logger.warning("Database does not have get_active_signals method - signals won't be loaded")
+                    # Initialize empty user_signals dict
+                    self.user_signals = {}
+            except AttributeError:
+                self.logger.warning("Database missing get_active_signals method - falling back to empty signals")
+                # Initialize empty user_signals dict
+                self.user_signals = {}
+                
+            self.logger.info("Signals loaded")
+            
+        except Exception as e:
+            self.logger.error(f"Error loading signals: {str(e)}")
+            self.logger.exception(e)
+            # Initialize empty user_signals dict in case of error
+            self.user_signals = {}
+
+    async def back_signals_callback(self, update: Update, context=None) -> int:
+        """Handle back_signals button press"""
+        query = update.callback_query
+        await query.answer()
+        
+        logger.info("back_signals_callback called")
+        
+        # Create keyboard for signal menu
+        keyboard = [
+            [InlineKeyboardButton("📊 Add Signal", callback_data="signals_add")],
+            [InlineKeyboardButton("⚙️ Manage Signals", callback_data="signals_manage")],
+            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Update message
+        await self.update_message(
+            query=query,
+            text="<b>📈 Signal Management</b>\n\nManage your trading signals",
+            keyboard=reply_markup
+        )
+        
+        return SIGNALS
 
     async def analysis_callback(self, update: Update, context=None) -> int:
         """Handle back button from market selection to analysis menu"""
