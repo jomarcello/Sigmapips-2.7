@@ -2127,7 +2127,6 @@ else:
 # Set environment variables for the API keys with sanitization
 os.environ["PERPLEXITY_API_KEY"] = PERPLEXITY_API_KEY
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY  # Changed from DeepSeek to OpenAI
-# No Tavily environment needed
 
 class TelegramService:
     def __init__(self, db: Database, stripe_service=None, bot_token: Optional[str] = None, proxy_url: Optional[str] = None, lazy_init: bool = False):
@@ -3563,7 +3562,6 @@ else:
 # Set environment variables for the API keys with sanitization
 os.environ["PERPLEXITY_API_KEY"] = PERPLEXITY_API_KEY
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY  # Changed from DeepSeek to OpenAI
-# No Tavily environment needed
 
 class TelegramService:
     def __init__(self, db: Database, stripe_service=None, bot_token: Optional[str] = None, proxy_url: Optional[str] = None, lazy_init: bool = False):
@@ -5603,6 +5601,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
     async def analyze_from_signal_callback(self, update: Update, context=None) -> int:
         """Handle Analyze Market button from signal notifications"""
         query = update.callback_query
+        await query.answer()  # Acknowledge the callback query
         logger.info(f"analyze_from_signal_callback called with data: {query.data}")
         
         try:
@@ -5657,6 +5656,42 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                                     signal['id'] = signal_id
                                 await self.db.store_signal(user_id, signal)
                                 logger.info(f"Stored signal {signal_id} in database for user {user_id}")
+                    
+                    # Try to retrieve signal from database if not found in memory
+                    elif signal_id and hasattr(self, 'db') and self.db:
+                        try:
+                            signal = await self.db.get_signal(user_id, signal_id)
+                            if signal:
+                                # Store in memory for future use
+                                if not hasattr(self, 'user_signals'):
+                                    self.user_signals = {}
+                                
+                                if user_str_id not in self.user_signals:
+                                    self.user_signals[user_str_id] = {}
+                                self.user_signals[user_str_id][signal_id] = signal
+                                
+                                # Store in context
+                                context.user_data['signal_direction'] = signal.get('direction')
+                                context.user_data['signal_timeframe'] = signal.get('interval') or signal.get('timeframe')
+                                # Backup copies
+                                context.user_data['signal_direction_backup'] = signal.get('direction')
+                                context.user_data['signal_timeframe_backup'] = signal.get('interval') or signal.get('timeframe')
+                                logger.info(f"Retrieved and stored signal details from database: direction={signal.get('direction')}, timeframe={signal.get('interval') or signal.get('timeframe')}")
+                            else:
+                                # If signal not found by ID, try to find by instrument and create a new entry
+                                logger.info(f"Signal {signal_id} not found in database, checking memory for signal data")
+                                if hasattr(self, 'user_signals') and user_str_id in self.user_signals:
+                                    # Look for any signals with this instrument
+                                    for sig_id, sig_data in self.user_signals[user_str_id].items():
+                                        if sig_data.get('instrument') == instrument:
+                                            # Create a copy with the correct ID
+                                            signal_copy = sig_data.copy()
+                                            signal_copy['id'] = signal_id
+                                            await self.db.store_signal(user_id, signal_copy)
+                                            logger.info(f"Created and stored signal {signal_id} in database for user {user_id}")
+                                            break
+                        except Exception as db_error:
+                            logger.error(f"Error retrieving signal from database: {str(db_error)}")
             else:
                 # Legacy support - just extract the instrument
                 instrument = parts[3] if len(parts) >= 4 else None
@@ -5672,23 +5707,30 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             # Show analysis options for this instrument
             # Format message
             # Use the SIGNAL_ANALYSIS_KEYBOARD for consistency
-            keyboard = SIGNAL_ANALYSIS_KEYBOARD
+            keyboard = [
+                [InlineKeyboardButton("📈 Technical Analysis", callback_data="signal_technical")],
+                [InlineKeyboardButton("🧠 Market Sentiment", callback_data="signal_sentiment")],
+                [InlineKeyboardButton("📅 Economic Calendar", callback_data="signal_calendar")],
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_signal")]
+            ]
             
             # Try to edit the message text
             try:
                 await query.edit_message_text(
-                    text=f"Select your analysis type:",
+                    text=f"Select your analysis type for {instrument}:",
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
+                logger.info(f"Successfully displayed analysis options for {instrument}")
             except Exception as e:
                 logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
                 # Fall back to sending a new message
                 await query.message.reply_text(
-                    text=f"Select your analysis type:",
+                    text=f"Select your analysis type for {instrument}:",
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
+                logger.info(f"Sent new message with analysis options for {instrument}")
             
             return CHOOSE_ANALYSIS
         
@@ -5750,58 +5792,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         except Exception as e:
             logger.error(f"Error storing original signal page: {str(e)}")
             return False
-
-    async def market_signals_callback(self, update: Update, context=None) -> int:
-        """Handle signals market selection"""
-        query = update.callback_query
-        await query.answer()
-        
-        # Set the signal context flag
-        if context and hasattr(context, 'user_data'):
-            context.user_data['is_signals_context'] = True
-        
-        # Get the signals GIF URL
-        gif_url = await get_signals_gif()
-        
-        # Update the message with the GIF and keyboard
-        success = await gif_utils.update_message_with_gif(
-            query=query,
-            gif_url=gif_url,
-            text="Select a market for trading signals:",
-            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-        )
-        
-        if not success:
-            # If the helper function failed, try a direct approach as fallback
-            try:
-                # First try to edit message text
-                await query.edit_message_text(
-                    text="Select a market for trading signals:",
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-                )
-            except Exception as text_error:
-                # If that fails due to caption, try editing caption
-                if "There is no text in the message to edit" in str(text_error):
-                    try:
-                        await query.edit_message_caption(
-                            caption="Select a market for trading signals:",
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to update caption in market_signals_callback: {str(e)}")
-                        # Try to send a new message as last resort
-                        await query.message.reply_text(
-                            text="Select a market for trading signals:",
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-                        )
-                else:
-                    # Re-raise for other errors
-                    raise
-                    
-        return CHOOSE_MARKET
         
     async def market_callback(self, update: Update, context=None) -> int:
         """Handle market selection and show appropriate instruments"""
@@ -7186,51 +7176,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 except Exception:
                     pass
                 return MENU
-
-    async def handle_subscription_callback(self, update: Update, context=None) -> int:
-        """Handle subscription button press"""
-        query = update.callback_query
-        await query.answer()
-        
-        # Check if we have Stripe service configured
-        if not self.stripe_service:
-            logger.error("Stripe service not configured")
-            await query.edit_message_text(
-                text="Sorry, subscription service is not available right now. Please try again later.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back_menu")]])
-            )
-            return MENU
-        
-        # Get the subscription URL
-        subscription_url = "https://buy.stripe.com/3cs3eF9Hu9256NW9AA"  # 14-day free trial URL
-        features = get_subscription_features()
-        
-        # Format the subscription message
-        message = f"""
-🚀 <b>Welcome to Sigmapips AI!</b> 🚀
-
-<b>Discover powerful trading signals for various markets:</b>
-• <b>Forex</b> - Major and minor currency pairs
-• <b>Crypto</b> - Bitcoin, Ethereum and other top cryptocurrencies
-• <b>Indices</b> - Global market indices
-• <b>Commodities</b> - Gold, silver and oil
-
-<b>Features:</b>
-✅ Real-time trading signals
-✅ Multi-timeframe analysis (1m, 15m, 1h, 4h)
-✅ Advanced chart analysis
-✅ Sentiment indicators
-✅ Economic calendar integration
-
-<b>Start today with a FREE 14-day trial!</b>
-"""
-        
-        # Create keyboard with subscription button
-        keyboard = [
-            [InlineKeyboardButton("🔥 Start 14-day FREE Trial", url=subscription_url)],
-            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
-        ]
-        
         # Update message with subscription information
         try:
             # Get a welcome GIF URL
@@ -7270,92 +7215,3 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             )
         
         return SUBSCRIBE
-        
-    async def signals_manage_callback(self, update: Update, context=None) -> int:
-        """Handle signals_manage callback to manage signal preferences"""
-        query = update.callback_query
-        await query.answer()
-        
-        logger.info("signals_manage_callback called")
-        
-        try:
-            # Get user's current subscriptions
-            user_id = update.effective_user.id
-            
-            # Fetch user's signal subscriptions from the database
-            try:
-                response = self.db.supabase.table('signal_subscriptions').select('*').eq('user_id', user_id).execute()
-                preferences = response.data if response and hasattr(response, 'data') else []
-            except Exception as db_error:
-                logger.error(f"Database error fetching signal subscriptions: {str(db_error)}")
-                preferences = []
-            
-            if not preferences:
-                # No subscriptions yet
-                text = "You don't have any signal subscriptions yet. Add some first!"
-                keyboard = [
-                    [InlineKeyboardButton("➕ Add Signal Pairs", callback_data="signals_add")],
-                    [InlineKeyboardButton("⬅️ Back", callback_data="back_signals")]
-                ]
-                
-                await self.update_message(
-                    query=query,
-                    text=text,
-                    keyboard=InlineKeyboardMarkup(keyboard),
-                    parse_mode=ParseMode.HTML
-                )
-                return CHOOSE_SIGNALS
-            
-            # Format current subscriptions
-            message = "<b>Your Signal Subscriptions:</b>\n\n"
-            
-            for i, pref in enumerate(preferences, 1):
-                market = pref.get('market', 'unknown')
-                instrument = pref.get('instrument', 'unknown')
-                timeframe = pref.get('timeframe', 'ALL')
-                
-                message += f"{i}. {market.upper()} - {instrument} ({timeframe})\n"
-            
-            # Add buttons to manage subscriptions
-            keyboard = [
-                [InlineKeyboardButton("➕ Add More", callback_data="signals_add")],
-                [InlineKeyboardButton("🗑️ Remove All", callback_data="delete_all_signals")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="back_signals")]
-            ]
-            
-            # Add individual delete buttons if there are preferences
-            if preferences:
-                for i, pref in enumerate(preferences):
-                    signal_id = pref.get('id')
-                    if signal_id:
-                        instrument = pref.get('instrument', 'unknown')
-                        keyboard.insert(-1, [InlineKeyboardButton(f"❌ Delete {instrument}", callback_data=f"delete_signal_{signal_id}")])
-            
-            await self.update_message(
-                query=query,
-                text=message,
-                keyboard=InlineKeyboardMarkup(keyboard),
-                parse_mode=ParseMode.HTML
-            )
-            
-            return CHOOSE_SIGNALS
-            
-        except Exception as e:
-            logger.error(f"Error in signals_manage_callback: {str(e)}")
-            
-            # Error recovery - go back to signals menu
-            keyboard = [
-                [InlineKeyboardButton("📊 Add Signal", callback_data="signals_add")],
-                [InlineKeyboardButton("⚙️ Manage Signals", callback_data="signals_manage")],
-                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.update_message(
-                query=query,
-                text="<b>📈 Signal Management</b>\n\nManage your trading signals",
-                keyboard=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
-            
-            return CHOOSE_SIGNALS
