@@ -1239,6 +1239,10 @@ class TelegramService:
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
+                        
+                        # Store signal in database for persistence
+                        if hasattr(self, 'db') and self.db:
+                            await self.db.store_signal(admin_id, normalized_data)
                 except Exception as e:
                     logger.error(f"Error sending test signal to admin: {str(e)}")
             
@@ -1280,6 +1284,10 @@ class TelegramService:
                         self.user_signals[user_str_id] = {}
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
+                    
+                    # Store signal in database for persistence
+                    if hasattr(self, 'db') and self.db:
+                        await self.db.store_signal(user_id, normalized_data)
                     
                 except Exception as e:
                     logger.error(f"Error sending signal to user {user_id}: {str(e)}")
@@ -2566,6 +2574,53 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         logger.info(f"Found signal with just instrument match, ID: {signal_id}")
             
             if not signal_data:
+                # Try to get signal from database if we have signal_id in context
+                signal_id_from_context = context.user_data.get('signal_id_backup') if context and hasattr(context, 'user_data') else None
+                
+                if signal_id_from_context and hasattr(self, 'db') and self.db:
+                    logger.info(f"Trying to retrieve signal {signal_id_from_context} from database")
+                    try:
+                        signal_data = await self.db.get_signal(user_id, signal_id_from_context)
+                        if signal_data:
+                            signal_id = signal_id_from_context
+                            logger.info(f"Retrieved signal {signal_id} from database")
+                            
+                            # Store in memory for future use
+                            if not hasattr(self, 'user_signals'):
+                                self.user_signals = {}
+                            
+                            user_str_id = str(user_id)
+                            if user_str_id not in self.user_signals:
+                                self.user_signals[user_str_id] = {}
+                                
+                            self.user_signals[user_str_id][signal_id] = signal_data
+                    except Exception as db_error:
+                        logger.error(f"Error retrieving signal from database: {str(db_error)}")
+                
+                # If still no signal data, try to get signals for this instrument from database
+                if not signal_data and signal_instrument and hasattr(self, 'db') and self.db:
+                    logger.info(f"Trying to retrieve signals for instrument {signal_instrument} from database")
+                    try:
+                        signals = await self.db.get_user_signals(user_id, signal_instrument)
+                        if signals and len(signals) > 0:
+                            # Use the most recent signal
+                            signal_data = signals[0]  # Already sorted by timestamp, newest first
+                            signal_id = signal_data.get('id')
+                            logger.info(f"Retrieved signal {signal_id} for instrument {signal_instrument} from database")
+                            
+                            # Store in memory for future use
+                            if not hasattr(self, 'user_signals'):
+                                self.user_signals = {}
+                            
+                            user_str_id = str(user_id)
+                            if user_str_id not in self.user_signals:
+                                self.user_signals[user_str_id] = {}
+                                
+                            self.user_signals[user_str_id][signal_id] = signal_data
+                    except Exception as db_error:
+                        logger.error(f"Error retrieving signals from database: {str(db_error)}")
+            
+            if not signal_data:
                 # Fallback message if signal not found
                 await query.edit_message_text(
                     text="Signal not found. Please use the main menu to continue.",
@@ -2640,6 +2695,27 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             context.user_data['signal_direction_backup'] = signal.get('direction')
                             context.user_data['signal_timeframe_backup'] = signal.get('interval')
                             logger.info(f"Stored signal details: direction={signal.get('direction')}, timeframe={signal.get('interval')}")
+                    # Try to retrieve signal from database if not found in memory
+                    elif signal_id and hasattr(self, 'db') and self.db:
+                        try:
+                            user_id = update.effective_user.id
+                            signal = await self.db.get_signal(user_id, signal_id)
+                            if signal:
+                                # Store in memory for future use
+                                user_str_id = str(user_id)
+                                if user_str_id not in self.user_signals:
+                                    self.user_signals[user_str_id] = {}
+                                self.user_signals[user_str_id][signal_id] = signal
+                                
+                                # Store in context
+                                context.user_data['signal_direction'] = signal.get('direction')
+                                context.user_data['signal_timeframe'] = signal.get('interval') or signal.get('timeframe')
+                                # Backup copies
+                                context.user_data['signal_direction_backup'] = signal.get('direction')
+                                context.user_data['signal_timeframe_backup'] = signal.get('interval') or signal.get('timeframe')
+                                logger.info(f"Retrieved and stored signal details from database: direction={signal.get('direction')}, timeframe={signal.get('interval') or signal.get('timeframe')}")
+                        except Exception as db_error:
+                            logger.error(f"Error retrieving signal from database: {str(db_error)}")
             else:
                 # Legacy support - just extract the instrument
                 instrument = parts[3] if len(parts) >= 4 else None
@@ -4594,39 +4670,40 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         try:
             self.logger.info("Loading stored signals")
             
+            # Initialize user_signals dictionary
+            self.user_signals = {}
+            
             try:
-                # Check if the get_active_signals method exists on the database object
-                if hasattr(self.db, 'get_active_signals'):
+                # Check if the database is available
+                if hasattr(self, 'db') and self.db:
+                    # Get active signals from database
                     signals = await self.db.get_active_signals()
-                    self.logger.info(f"Found {len(signals)} active signals")
+                    self.logger.info(f"Found {len(signals)} active signals in database")
                     
                     # Process each signal
                     for signal in signals:
                         # Check necessary fields
-                        if 'user_id' in signal and 'market' in signal and 'instrument' in signal:
+                        if 'id' in signal and 'user_id' in signal and 'instrument' in signal:
+                            signal_id = signal['id']
                             user_id = signal['user_id']
-                            market = signal['market']
                             instrument = signal['instrument']
                             
-                            # Add to user_signals dictionary
-                            if user_id not in self.user_signals:
-                                self.user_signals[user_id] = {}
-                            if market not in self.user_signals[user_id]:
-                                self.user_signals[user_id][market] = []
+                            # Store signal in memory for quick access
+                            user_str_id = str(user_id)
+                            if user_str_id not in self.user_signals:
+                                self.user_signals[user_str_id] = {}
+                                
+                            # Store the full signal data
+                            self.user_signals[user_str_id][signal_id] = signal
                             
-                            # Add instrument if not already in list
-                            if instrument not in self.user_signals[user_id][market]:
-                                self.user_signals[user_id][market].append(instrument)
+                            self.logger.info(f"Loaded signal {signal_id} for user {user_id}")
                 else:
-                    self.logger.warning("Database does not have get_active_signals method - signals won't be loaded")
-                    # Initialize empty user_signals dict
-                    self.user_signals = {}
-            except AttributeError:
-                self.logger.warning("Database missing get_active_signals method - falling back to empty signals")
-                # Initialize empty user_signals dict
-                self.user_signals = {}
+                    self.logger.warning("Database not available - signals won't be loaded")
+            except Exception as e:
+                self.logger.error(f"Error loading signals from database: {str(e)}")
+                self.logger.exception(e)
                 
-            self.logger.info("Signals loaded")
+            self.logger.info(f"Total signals loaded: {sum(len(signals) for signals in self.user_signals.values())}")
             
         except Exception as e:
             self.logger.error(f"Error loading signals: {str(e)}")

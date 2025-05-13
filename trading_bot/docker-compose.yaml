@@ -15,6 +15,7 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - NODE_OPTIONS=--max-old-space-size=2048  # Voorkom Node.js geheugenproblemen
+      - REDIS_URL=redis://redis:6379  # Redis connection URL
     volumes:
       - ./data:/app/data  # Persistente data opslag
       - ./logs:/app/logs  # Logs bewaren
@@ -26,6 +27,10 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
+    depends_on:
+      - redis
+    networks:
+      - tradingbot-network
     # GPU-versnelling indien beschikbaar
     # Indien je een NVIDIA GPU hebt, ontcommentaar de volgende regels:
     # deploy:
@@ -39,7 +44,7 @@ services:
     #   - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
     #   - PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 
-  # Optioneel: Redis cache service toevoegen voor snellere caching
+  # Redis cache service voor signaalopslag en snellere caching
   redis:
     image: redis:alpine
     container_name: tradingbot-redis
@@ -47,6 +52,8 @@ services:
     volumes:
       - redis-data:/data
     command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - tradingbot-network
 
   # Optioneel: Monitoring met Grafana
   # grafana:
@@ -60,7 +67,13 @@ services:
   #   environment:
   #     - GF_AUTH_ANONYMOUS_ENABLED=true
   #     - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+  #   networks:
+  #     - tradingbot-network
 
 volumes:
   redis-data:
   # grafana-data:
+
+networks:
+  tradingbot-network:
+    driver: bridge
