@@ -671,12 +671,81 @@ class Database:
         logger.warning(f"Could not map timeframe '{timeframe}' to a style, defaulting to 'intraday'")
         return 'intraday'
 
-    async def execute_query(self, query: str) -> List[Dict[str, Any]]:
+    async def execute_query(self, query: str, params=None) -> List[Dict[str, Any]]:
         """Execute a query on Supabase (simplified version)"""
         try:
             logger.info(f"Executing query: {query}")
             
+            if params:
+                logger.info(f"With parameters: {params}")
+            
             # Eenvoudige implementatie: haal alle subscriber_preferences op en filter handmatig
+            if "SELECT * FROM signals" in query:
+                # Handle signals queries differently
+                if "WHERE id =" in query and params and len(params) >= 2:
+                    signal_id = params[0]
+                    user_id = params[1]
+                    
+                    # Check Redis first
+                    if self.using_redis:
+                        try:
+                            key = f"signal:{user_id}:{signal_id}"
+                            signal_json = self.redis.get(key)
+                            if signal_json:
+                                logger.info(f"Retrieved signal from Redis: {signal_id}")
+                                return [json.loads(signal_json)]
+                        except Exception as redis_error:
+                            logger.error(f"Redis error: {str(redis_error)}")
+                    
+                    # Fall back to Supabase
+                    try:
+                        if hasattr(self, 'supabase') and self.supabase:
+                            # This is a simplified implementation
+                            # In a real system, you would use proper SQL queries
+                            logger.info(f"Querying signals table for id={signal_id}, user_id={user_id}")
+                            return []  # Return empty for now as we don't have a real implementation
+                    except Exception as supabase_error:
+                        logger.error(f"Supabase error: {str(supabase_error)}")
+                        
+                    return []
+                
+                elif "WHERE user_id =" in query and params and len(params) >= 1:
+                    user_id = params[0]
+                    instrument = None
+                    
+                    # Check if we're filtering by instrument
+                    if len(params) >= 2 and "AND instrument =" in query:
+                        instrument = params[1]
+                    
+                    # Check Redis for matching keys
+                    if self.using_redis:
+                        try:
+                            pattern = f"signal:{user_id}:*"
+                            keys = self.redis.keys(pattern)
+                            results = []
+                            
+                            for key in keys:
+                                signal_json = self.redis.get(key)
+                                if signal_json:
+                                    signal_data = json.loads(signal_json)
+                                    if instrument is None or signal_data.get('instrument') == instrument:
+                                        results.append(signal_data)
+                            
+                            # Sort by timestamp, newest first
+                            if results:
+                                results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+                                
+                            logger.info(f"Retrieved {len(results)} signals from Redis for user {user_id}")
+                            return results
+                        except Exception as redis_error:
+                            logger.error(f"Redis error: {str(redis_error)}")
+                    
+                    return []
+                
+                # Default implementation for other signals queries
+                return []
+            
+            # Default implementation for other tables
             result = self.supabase.table('subscriber_preferences').select('*').execute()
             
             # Log het resultaat
@@ -1550,7 +1619,8 @@ class Database:
                 try:
                     # Get signals from the last 7 days
                     result = self.execute_query(
-                        "SELECT * FROM signals WHERE timestamp > NOW() - INTERVAL '7 days' ORDER BY timestamp DESC"
+                        "SELECT * FROM signals WHERE timestamp > NOW() - INTERVAL '7 days' ORDER BY timestamp DESC",
+                        []  # Empty params array to match the new execute_query signature
                     )
                     
                     if result and len(result) > 0:
