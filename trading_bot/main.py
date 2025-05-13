@@ -9880,7 +9880,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             return MENU
 
-async def analyze_from_signal_callback(self, update: Update, context=None) -> int:
+    async def analyze_from_signal_callback(self, update: Update, context=None) -> int:
     """Handle Analyze Market button from signal notifications"""
     query = update.callback_query
     logger.info(f"analyze_from_signal_callback called with data: {query.data}")
