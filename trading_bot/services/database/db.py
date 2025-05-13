@@ -19,7 +19,30 @@ class Database:
         # Get environment variables
         self.supabase_url = os.getenv("SUPABASE_URL")
         self.supabase_key = os.getenv("SUPABASE_KEY")
-        self.redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
+        
+        # Handle Redis URL with proper fallbacks
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        
+        # Check if the Redis URL contains Railway placeholders (${{}})
+        if "${" in redis_url:
+            logger.warning(f"Redis URL contains unresolved placeholders: {redis_url}")
+            
+            # Try to construct a valid Redis URL from individual components
+            redis_password = os.getenv("REDIS_PASSWORD")
+            redis_host = os.getenv("REDISHOST", "localhost")
+            redis_port = os.getenv("REDISPORT", "6379")
+            redis_user = os.getenv("REDISUSER", "default")
+            
+            # If we have all required components, construct the URL
+            if redis_password:
+                redis_url = f"redis://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
+                logger.info(f"Constructed Redis URL from components: {redis_url.replace(redis_password, '****')}")
+            else:
+                # Fall back to localhost for local development
+                redis_url = "redis://localhost:6379"
+                logger.info(f"Falling back to local Redis URL: {redis_url}")
+        
+        self.redis_url = redis_url
         
         # Local caching
         self.cache = {}
@@ -60,13 +83,48 @@ class Database:
                 
             # Initialize Redis connection for caching if available
             try:
-                self.redis = redis.from_url(self.redis_url, decode_responses=True)
+                # Try to connect to Redis with a short timeout
+                self.redis = redis.from_url(self.redis_url, decode_responses=True, socket_timeout=5.0)
                 self.redis.ping()  # Test connection
                 self.using_redis = True
                 logger.info("Successfully connected to Redis")
+                
+                # Store a test key to verify write access
+                test_key = "test:connection"
+                test_value = f"connected_at_{datetime.datetime.now().isoformat()}"
+                self.redis.set(test_key, test_value, ex=60)  # Expire in 60 seconds
+                retrieved_value = self.redis.get(test_key)
+                
+                if retrieved_value == test_value:
+                    logger.info("Redis write/read test successful")
+                else:
+                    logger.warning(f"Redis write/read test failed. Expected: {test_value}, Got: {retrieved_value}")
+                    
             except Exception as e:
-                logger.warning(f"Redis connection failed: {str(e)}. Using local caching.")
-                self.redis = None
+                # If connection fails, try localhost as a fallback for local development
+                logger.warning(f"Redis connection failed: {str(e)}. Trying localhost fallback.")
+                try:
+                    local_redis_url = "redis://localhost:6379"
+                    self.redis = redis.from_url(local_redis_url, decode_responses=True, socket_timeout=5.0)
+                    self.redis.ping()  # Test connection
+                    self.using_redis = True
+                    self.redis_url = local_redis_url
+                    logger.info("Successfully connected to Redis using localhost fallback")
+                    
+                    # Store a test key to verify write access
+                    test_key = "test:connection"
+                    test_value = f"connected_at_{datetime.datetime.now().isoformat()}"
+                    self.redis.set(test_key, test_value, ex=60)  # Expire in 60 seconds
+                    retrieved_value = self.redis.get(test_key)
+                    
+                    if retrieved_value == test_value:
+                        logger.info("Redis write/read test successful")
+                    else:
+                        logger.warning(f"Redis write/read test failed. Expected: {test_value}, Got: {retrieved_value}")
+                        
+                except Exception as local_e:
+                    logger.warning(f"Local Redis connection also failed: {str(local_e)}. Using local caching.")
+                    self.redis = None
                 
             # Setup mock data if needed
             if self.use_mock_data:
@@ -88,6 +146,9 @@ class Database:
             'intraday': '1h',
             'swing': '4h'
         }
+        
+        # Initialize signal storage
+        self.signal_cache = {}
         
     def _setup_mock_data(self):
         """Set up mock data for development and testing"""
@@ -1368,69 +1429,18 @@ class Database:
             
             # Store in Supabase if available
             if hasattr(self, 'supabase') and self.supabase:
-                # Create signals table if it doesn't exist
                 try:
-                    self.execute_query("""
-                        CREATE TABLE IF NOT EXISTS signals (
-                            id VARCHAR(255) PRIMARY KEY,
-                            user_id BIGINT NOT NULL,
-                            instrument VARCHAR(50) NOT NULL,
-                            direction VARCHAR(10) NOT NULL,
-                            entry VARCHAR(50),
-                            stop_loss VARCHAR(50),
-                            take_profit VARCHAR(50),
-                            tp1 VARCHAR(50),
-                            tp2 VARCHAR(50),
-                            tp3 VARCHAR(50),
-                            timeframe VARCHAR(10),
-                            market VARCHAR(50),
-                            message TEXT,
-                            timestamp TIMESTAMP NOT NULL,
-                            created_at TIMESTAMP DEFAULT NOW()
-                        )
-                    """)
-                    
-                    # Insert signal data
-                    columns = ['id', 'user_id', 'instrument', 'direction', 'entry', 'stop_loss', 
-                              'take_profit', 'tp1', 'tp2', 'tp3', 'timeframe', 'market', 
-                              'message', 'timestamp']
-                    
-                    values = []
-                    placeholders = []
-                    
-                    for i, col in enumerate(columns):
-                        if col in signal_data:
-                            values.append(signal_data[col])
-                            placeholders.append(f"%s")
-                    
-                    columns_str = ", ".join(columns)
-                    placeholders_str = ", ".join(placeholders)
-                    
-                    query = f"""
-                        INSERT INTO signals ({columns_str})
-                        VALUES ({placeholders_str})
-                        ON CONFLICT (id) DO UPDATE SET
-                        user_id = EXCLUDED.user_id,
-                        instrument = EXCLUDED.instrument,
-                        direction = EXCLUDED.direction,
-                        entry = EXCLUDED.entry,
-                        stop_loss = EXCLUDED.stop_loss,
-                        take_profit = EXCLUDED.take_profit,
-                        tp1 = EXCLUDED.tp1,
-                        tp2 = EXCLUDED.tp2,
-                        tp3 = EXCLUDED.tp3,
-                        timeframe = EXCLUDED.timeframe,
-                        market = EXCLUDED.market,
-                        message = EXCLUDED.message,
-                        timestamp = EXCLUDED.timestamp
-                    """
-                    
-                    self.execute_query(query, values)
-                    logger.info(f"Stored signal in database: {signal_data['id']}")
-                    return True
-                    
+                    # Insert signal data into the signals table
+                    response = self.supabase.table('signals').insert(signal_data).execute()
+                    if response and hasattr(response, 'data') and response.data:
+                        logger.info(f"Stored signal in Supabase: {signal_data['id']}")
+                        # Also store in Redis for faster access
+                        if self.using_redis:
+                            key = f"signal:{user_id}:{signal_data['id']}"
+                            self.redis.setex(key, 30 * 24 * 60 * 60, json.dumps(signal_data))
+                        return True
                 except Exception as e:
-                    logger.error(f"Error creating signals table or inserting data: {str(e)}")
+                    logger.error(f"Error storing signal in Supabase: {str(e)}")
                     # Fall back to Redis or memory cache
             
             # Store in Redis if available
