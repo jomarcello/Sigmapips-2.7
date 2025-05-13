@@ -1590,7 +1590,33 @@ class Database:
             
             # Sort signals by timestamp, newest first
             if signals:
-                signals.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+                try:
+                    # Define a safe sorting key function that handles different timestamp formats
+                    def get_timestamp_key(signal):
+                        timestamp = signal.get('timestamp', '')
+                        if isinstance(timestamp, (int, float)):
+                            return float(timestamp)
+                        elif isinstance(timestamp, str):
+                            # Try to parse ISO format timestamp
+                            try:
+                                # Remove timezone info if present
+                                if timestamp.endswith('Z'):
+                                    timestamp = timestamp[:-1]
+                                if '+' in timestamp:
+                                    timestamp = timestamp.split('+')[0]
+                                
+                                # Parse the timestamp
+                                dt = datetime.datetime.fromisoformat(timestamp)
+                                return dt.timestamp()
+                            except (ValueError, TypeError):
+                                # If parsing fails, return a default old timestamp
+                                return 0
+                        return 0  # Default for any other case
+                    
+                    signals.sort(key=get_timestamp_key, reverse=True)
+                    logger.info("Signals sorted by timestamp")
+                except Exception as sort_error:
+                    logger.error(f"Error sorting signals: {str(sort_error)}")
             
             return signals
             
@@ -1654,6 +1680,36 @@ class Database:
                         signals.append(signal_data)
                 
                 logger.info(f"Retrieved {len(signals)} active signals from memory cache")
+            
+            # Sort signals by timestamp, newest first
+            if signals:
+                try:
+                    # Define a safe sorting key function that handles different timestamp formats
+                    def get_timestamp_key(signal):
+                        timestamp = signal.get('timestamp', '')
+                        if isinstance(timestamp, (int, float)):
+                            return float(timestamp)
+                        elif isinstance(timestamp, str):
+                            # Try to parse ISO format timestamp
+                            try:
+                                # Remove timezone info if present
+                                if timestamp.endswith('Z'):
+                                    timestamp = timestamp[:-1]
+                                if '+' in timestamp:
+                                    timestamp = timestamp.split('+')[0]
+                                
+                                # Parse the timestamp
+                                dt = datetime.datetime.fromisoformat(timestamp)
+                                return dt.timestamp()
+                            except (ValueError, TypeError):
+                                # If parsing fails, return a default old timestamp
+                                return 0
+                        return 0  # Default for any other case
+                    
+                    signals.sort(key=get_timestamp_key, reverse=True)
+                    logger.info("Active signals sorted by timestamp")
+                except Exception as sort_error:
+                    logger.error(f"Error sorting active signals: {str(sort_error)}")
             
             return signals
             
