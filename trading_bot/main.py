@@ -2869,58 +2869,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             logger.error(f"Error in button_callback: {str(e)}")
             logger.exception(e)
             return MENU
-
-    async def market_signals_callback(self, update: Update, context=None) -> int:
-        """Handle signals market selection"""
-        query = update.callback_query
-        await query.answer()
-        
-        # Set the signal context flag
-        if context and hasattr(context, 'user_data'):
-            context.user_data['is_signals_context'] = True
-        
-        # Get the signals GIF URL
-        gif_url = await get_signals_gif()
-        
-        # Update the message with the GIF and keyboard
-        success = await gif_utils.update_message_with_gif(
-            query=query,
-            gif_url=gif_url,
-            text="Select a market for trading signals:",
-            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-        )
-        
-        if not success:
-            # If the helper function failed, try a direct approach as fallback
-            try:
-                # First try to edit message text
-                await query.edit_message_text(
-                    text="Select a market for trading signals:",
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-                )
-            except Exception as text_error:
-                # If that fails due to caption, try editing caption
-                if "There is no text in the message to edit" in str(text_error):
-                    try:
-                        await query.edit_message_caption(
-                            caption="Select a market for trading signals:",
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to update caption in market_signals_callback: {str(e)}")
-                        # Try to send a new message as last resort
-                        await query.message.reply_text(
-                            text="Select a market for trading signals:",
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD_SIGNALS)
-                        )
-                else:
-                    # Re-raise for other errors
-                    raise
-                    
-        return CHOOSE_MARKET
         
     async def market_callback(self, update: Update, context=None) -> int:
         """Handle market selection and show appropriate instruments"""
@@ -4273,30 +4221,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             return CHOOSE_SIGNALS
 
-    async def back_signals_callback(self, update: Update, context=None) -> int:
-        """Handle back_signals button press"""
-        query = update.callback_query
-        await query.answer()
-        
-        logger.info("back_signals_callback called")
-        
-        # Create keyboard for signal menu
-        keyboard = [
-            [InlineKeyboardButton("📊 Add Signal", callback_data="signals_add")],
-            [InlineKeyboardButton("⚙️ Manage Signals", callback_data="signals_manage")],
-            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # Update message
-        await self.update_message(
-            query=query,
-            text="<b>📈 Signal Management</b>\n\nManage your trading signals",
-            keyboard=reply_markup
-        )
-        
-        return SIGNALS
-
     async def analysis_callback(self, update: Update, context=None) -> int:
         """Handle back button from market selection to analysis menu"""
         query = update.callback_query
@@ -4636,7 +4560,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             try:
                 response = self.db.supabase.table('signal_subscriptions').select('*').eq('user_id', user_id).execute()
                 preferences = response.data if response and hasattr(response, 'data') else []
-                        except Exception as db_error:
+            except Exception as db_error:
                 logger.error(f"Database error fetching signal subscriptions: {str(db_error)}")
                 preferences = []
             
