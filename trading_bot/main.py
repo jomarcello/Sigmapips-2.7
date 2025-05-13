@@ -718,7 +718,7 @@ class TelegramService:
         self.signals_dir = "data/signals"
         self.signals_enabled_val = True
         self.polling_started = False
-        self.admin_users = [1093307376]  # Add your Telegram ID here for testing
+        self.admin_users = [2004519703]  # Updated with correct Telegram ID from logs
         self._signals_enabled = True  # Enable signals by default
         
         # Setup logger
