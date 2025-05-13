@@ -2507,9 +2507,11 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 
                 # Reset signal flow flags but keep the signal info
                 context.user_data['from_signal'] = True
+                context.user_data['in_signal_flow'] = True  # Added missing flag
                 
                 # Log retrieved values for debugging
                 logger.info(f"Retrieved signal data from context: instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}")
+                logger.info(f"Set signal flow flags: from_signal=True, in_signal_flow=True")
             
             # Find the most recent signal for this user based on context data
             signal_data = None
@@ -2611,6 +2613,11 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     context.user_data['instrument'] = instrument
                     if signal_id:
                         context.user_data['signal_id'] = signal_id
+                    
+                    # Set signal flow flags
+                    context.user_data['from_signal'] = True
+                    context.user_data['in_signal_flow'] = True
+                    logger.info(f"Set signal flow flags: from_signal=True, in_signal_flow=True")
                     
                     # Make a backup copy to ensure we can return to signal later
                     context.user_data['signal_instrument_backup'] = instrument
@@ -4303,10 +4310,12 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             instrument = context.user_data.get('instrument')
             signal_id = context.user_data.get('signal_id')
             
-            # Set flag to indicate we're in signal flow
+            # Set flags to indicate we're in signal flow
             context.user_data['from_signal'] = True
+            context.user_data['in_signal_flow'] = True  # Added missing flag
             
             logger.info(f"Going back to signal analysis for instrument: {instrument}, signal_id: {signal_id}")
+            logger.info(f"Set signal flow flags: from_signal=True, in_signal_flow=True")
             
             # Prepare keyboard
             keyboard = SIGNAL_ANALYSIS_KEYBOARD
