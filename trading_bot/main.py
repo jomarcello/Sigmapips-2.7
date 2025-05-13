@@ -1420,10 +1420,14 @@ class TelegramService:
             
             # Ensure back_instrument is properly handled
             application.add_handler(CallbackQueryHandler(self.back_instrument_callback, pattern="^back_instrument$"))
-            
+        except Exception as e:
+            logger.error(f"Error registering handlers: {str(e)}")
+            logger.exception(e)
+
     @property
     def signals_enabled(self):
         """Get whether signals processing is enabled"""
+        return self._signals_enabled
 
 # Setup detailed logging configuration
 def setup_logging(log_level=None):
@@ -2839,6 +2843,19 @@ class TelegramService:
             
             # Ensure back_instrument is properly handled
             application.add_handler(CallbackQueryHandler(self.back_instrument_callback, pattern="^back_instrument$"))
+        except Exception as e:
+            logger.error(f"Error registering handlers: {str(e)}")
+            logger.exception(e)
+
+    @property
+    def signals_enabled(self):
+        """Get whether signals processing is enabled"""
+        return self._signals_enabled
+
+# Setup detailed logging configuration
+def setup_logging(log_level=None):
+    """Configure structured logging for the application"""
+    log_level = log_level or os.environ.get("LOG_LEVEL", "INFO").upper()
             
 # Import necessary modules for improved logging
 import os
@@ -4298,29 +4315,14 @@ class TelegramService:
             
             # Ensure back_instrument is properly handled
             application.add_handler(CallbackQueryHandler(self.back_instrument_callback, pattern="^back_instrument$"))
-            
-            # Catch-all handler for any other callbacks
-            application.add_handler(CallbackQueryHandler(self.button_callback))
-            
-            # Don't load signals here - it will be done in initialize_services
-            # self._load_signals()
-            
-            logger.info("Bot setup completed successfully")
-            
         except Exception as e:
-            logger.error(f"Error setting up bot handlers: {str(e)}")
+            logger.error(f"Error registering handlers: {str(e)}")
             logger.exception(e)
 
     @property
     def signals_enabled(self):
         """Get whether signals processing is enabled"""
         return self._signals_enabled
-    
-    @signals_enabled.setter
-    def signals_enabled(self, value):
-        """Set whether signals processing is enabled"""
-        self._signals_enabled = bool(value)
-        logger.info(f"Signal processing is now {'enabled' if value else 'disabled'}")
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
         """Send a welcome message when the bot is started."""
