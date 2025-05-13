@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 # Bot token provided by the user
 BOT_TOKEN = "7328581013:AAGDFJyvipmQsV5UQLjUeLQmX2CWIU2VMjk"
 
-# Test user ID (replace with your own Telegram user ID)
-TEST_USER_ID = None  # Will be set when the bot starts
+# Test user ID - BELANGRIJK: Vul hier je eigen Telegram user ID in
+TEST_USER_ID = 2004519703  # Jouw Telegram user ID
 
 async def format_signal_message(signal_data):
     """Format signal data into a nice message"""
@@ -179,27 +179,16 @@ async def send_multiple_test_signals():
         # Initialize the bot
         bot = Bot(token=BOT_TOKEN)
         
-        # Get bot information and user ID
+        # Get bot information
         bot_info = await bot.get_me()
         logger.info(f"Bot initialized: @{bot_info.username}")
         
-        # Get updates to find user ID if not set
-        global TEST_USER_ID
+        # Gebruik de vooraf ingestelde TEST_USER_ID
         if not TEST_USER_ID:
-            updates = await bot.get_updates(limit=10)
-            if updates:
-                # Use the user ID from the most recent update
-                for update in reversed(updates):
-                    if update.message and update.message.from_user:
-                        TEST_USER_ID = update.message.from_user.id
-                        logger.info(f"Found user ID from updates: {TEST_USER_ID}")
-                        break
+            logger.error("❌ Geen TEST_USER_ID ingesteld. Vul je Telegram user ID in in het script.")
+            return
         
-        if not TEST_USER_ID:
-            logger.warning("No user ID found in updates. Please send a message to the bot first.")
-            logger.info("Continuing with sending signals to the bot directly for testing...")
-            # For testing, you can set a specific chat ID here
-            TEST_USER_ID = bot_info.id
+        logger.info(f"Sending test signals to user ID: {TEST_USER_ID}")
         
         # Test signals to send
         test_signals = [
