@@ -7,22 +7,21 @@ import logging.config
 from datetime import datetime
 
 
-
-    async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
-            
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+async def _get_signal_related_trades(self, signal_id):
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
+        
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
 
 from telegram.error import TelegramError, BadRequest
@@ -521,7 +520,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-        else:
+    else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -539,7 +538,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-            else:
+        else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -580,7 +579,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-            else:
+        else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -607,7 +606,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -685,7 +684,7 @@ class TelegramService:
         self.sentiment_cache_ttl = 60 * 60  # 1 hour in seconds
         
         # Start the bot
-        try:
+    try:
             # Check for bot token
             if not self.bot_token:
                 raise ValueError("Missing Telegram bot token")
@@ -707,13 +706,13 @@ class TelegramService:
             # Keep track of processed updates
             self.processed_updates = set()
             
-        except Exception as e:
-            logger.error(f"Error initializing Telegram service: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing Telegram service: {str(e)}")
             raise
 
     async def initialize_services(self):
         """Initialize services that require an asyncio event loop"""
-        try:
+    try:
             # Initialize chart service
             await self.chart_service.initialize()
             logger.info("Chart service initialized")
@@ -731,20 +730,20 @@ class TelegramService:
                 # Schedule periodic cleanup (every 24 hours)
                 async def periodic_cleanup():
                     while True:
-                        try:
+                    try:
                             # Wait for 24 hours
                             await asyncio.sleep(24 * 60 * 60)
                             # Run cleanup
                             cleaned = await self._cleanup_old_signals(max_age_days=7)
                             logger.info(f"Periodic signal cleanup completed, removed {cleaned} old signals")
-                        except Exception as e:
-                            logger.error(f"Error in periodic signal cleanup: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error in periodic signal cleanup: {str(e)}")
                 
                 # Start the periodic cleanup task
                 asyncio.create_task(periodic_cleanup())
                 logger.info("Scheduled periodic signal cleanup")
-        except Exception as e:
-            logger.error(f"Error initializing services: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing services: {str(e)}")
             raise
             
     # Calendar service helpers
@@ -769,11 +768,11 @@ class TelegramService:
             return "<b>📅 Economic Calendar</b>\n\nNo economic events found for today."
         
         # Sort events by time
-        try:
+    try:
             # Try to parse time for sorting
             def parse_time_for_sorting(event):
                 time_str = event.get('time', '')
-                try:
+            try:
                     # Extract hour and minute if in format like "08:30 EST"
                     if ':' in time_str:
                         parts = time_str.split(' ')[0].split(':')
@@ -786,7 +785,7 @@ class TelegramService:
             
             # Sort the events by time
             sorted_events = sorted(calendar_data, key=parse_time_for_sorting)
-        except Exception as e:
+    except Exception as e:
             self.logger.error(f"Error sorting calendar events: {str(e)}")
             sorted_events = calendar_data
         
@@ -828,7 +827,7 @@ class TelegramService:
     # Utility functions that might be missing
     async def update_message(self, query, text, keyboard=None, parse_mode=ParseMode.HTML):
         """Utility to update a message with error handling"""
-        try:
+    try:
             # Check if the message is too long for Telegram caption limits (1024 chars)
             MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
             MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
@@ -848,7 +847,7 @@ class TelegramService:
                 return True
             # If message is too long even for a text message
             elif len(text) > MAX_MESSAGE_LENGTH:
-                logger.warning(f"Message too long ({len(text)} chars), truncating")
+            logger.warning(f"Message too long ({len(text)} chars), truncating")
                 # Find a good breaking point
                 truncated = text[:MAX_MESSAGE_LENGTH-100]
                 
@@ -867,7 +866,7 @@ class TelegramService:
                     parse_mode=parse_mode
                 )
                 return True
-            else:
+        else:
                 # Normal case - message is within limits
                 # Try to edit message text first
                 await query.edit_message_text(
@@ -876,16 +875,16 @@ class TelegramService:
                     parse_mode=parse_mode
                 )
                 return True
-        except Exception as e:
-            logger.warning(f"Could not update message text: {str(e)}")
+    except Exception as e:
+        logger.warning(f"Could not update message text: {str(e)}")
             
             # If text update fails, try to edit caption
-            try:
+        try:
                 # Check if caption is too long
                 MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
                 
                 if len(text) > MAX_CAPTION_LENGTH:
-                    logger.warning(f"Caption too long ({len(text)} chars), truncating")
+                logger.warning(f"Caption too long ({len(text)} chars), truncating")
                     # Find a good breaking point
                     truncated = text[:MAX_CAPTION_LENGTH-100]
                     
@@ -903,7 +902,7 @@ class TelegramService:
                         reply_markup=keyboard,
                         parse_mode=parse_mode
                     )
-                else:
+            else:
                     # Caption is within limits
                     await query.edit_message_caption(
                         caption=text,
@@ -912,17 +911,17 @@ class TelegramService:
                     )
                 return True
             except Exception as e2:
-                logger.error(f"Could not update caption either: {str(e2)}")
+            logger.error(f"Could not update caption either: {str(e2)}")
                 
                 # As a last resort, send a new message
-                try:
+            try:
                     chat_id = query.message.chat_id
                     
                     # Check if message is too long
                     MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
                     
                     if len(text) > MAX_MESSAGE_LENGTH:
-                        logger.warning(f"New message too long ({len(text)} chars), truncating")
+                    logger.warning(f"New message too long ({len(text)} chars), truncating")
                         # Find a good breaking point
                         truncated = text[:MAX_MESSAGE_LENGTH-100]
                         
@@ -941,7 +940,7 @@ class TelegramService:
                             reply_markup=keyboard,
                             parse_mode=parse_mode
                         )
-                    else:
+                else:
                         # Message is within limits
                         await query.bot.send_message(
                             chat_id=chat_id,
@@ -951,7 +950,7 @@ class TelegramService:
                         )
                     return True
                 except Exception as e3:
-                    logger.error(f"Failed to send new message: {str(e3)}")
+                logger.error(f"Failed to send new message: {str(e3)}")
                     return False
     
     # Missing handler implementations
@@ -1015,7 +1014,7 @@ class TelegramService:
         Returns:
             List of subscribed user IDs
         """
-        try:
+    try:
             logger.info(f"Getting subscribers for {instrument} timeframe: {timeframe}")
             
             # Get all subscribers from the database
@@ -1023,7 +1022,7 @@ class TelegramService:
             subscribers = await self.db.get_signal_subscriptions(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return []
                 
             # Filter out subscribers that don't have an active subscription
@@ -1039,13 +1038,13 @@ class TelegramService:
                 
                 if is_subscribed and not payment_failed:
                     active_subscribers.append(user_id)
-                else:
+            else:
                     logger.info(f"User {user_id} doesn't have an active subscription, skipping signal")
             
             return active_subscribers
             
-        except Exception as e:
-            logger.error(f"Error getting subscribers: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting subscribers: {str(e)}")
             # FOR TESTING: Add admin users if available
             if hasattr(self, 'admin_users') and self.admin_users:
                 logger.info(f"Returning admin users for testing: {self.admin_users}")
@@ -1063,7 +1062,7 @@ class TelegramService:
         Returns:
             bool: True if signal was processed successfully, False otherwise
         """
-        try:
+    try:
             # Log the incoming signal data
             logger.info(f"Processing signal: {signal_data}")
             
@@ -1114,13 +1113,13 @@ class TelegramService:
                     'take_profit': take_profit,
                     'timeframe': timeframe
                 }
-            else:
-                logger.error(f"Missing required signal data")
+        else:
+            logger.error(f"Missing required signal data")
                 return False
             
             # Basic validation
             if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
-                logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
+            logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
                 return False
                 
             # Create signal ID for tracking
@@ -1148,7 +1147,7 @@ class TelegramService:
             
             # FOR TESTING: Always send to admin for testing
             if hasattr(self, 'admin_users') and self.admin_users:
-                try:
+            try:
                     logger.info(f"Sending signal to admin users for testing: {self.admin_users}")
                     for admin_id in self.admin_users:
                         # Prepare keyboard with analysis options
@@ -1174,15 +1173,15 @@ class TelegramService:
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
-                except Exception as e:
-                    logger.error(f"Error sending test signal to admin: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending test signal to admin: {str(e)}")
             
             # Get subscribers for this instrument
             timeframe = normalized_data.get('timeframe', '1h')
             subscribers = await self.get_subscribers_for_instrument(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return True  # Successfully processed, just no subscribers
             
             # Send signal to all subscribers
@@ -1190,7 +1189,7 @@ class TelegramService:
             
             sent_count = 0
             for user_id in subscribers:
-                try:
+            try:
                     # Prepare keyboard with analysis options
                     keyboard = [
                         [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
@@ -1216,20 +1215,20 @@ class TelegramService:
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
                     
-                except Exception as e:
-                    logger.error(f"Error sending signal to user {user_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending signal to user {user_id}: {str(e)}")
             
             logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
             return True
             
-        except Exception as e:
-            logger.error(f"Error processing signal: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error processing signal: {str(e)}")
+        logger.exception(e)
             return False
 
     def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
         """Format signal data into a nice message for Telegram"""
-        try:
+    try:
             # Extract fields from signal data
             instrument = signal_data.get('instrument', 'Unknown')
             direction = signal_data.get('direction', 'Unknown')
@@ -1280,25 +1279,25 @@ class TelegramService:
             
             return message
             
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error formatting signal message: {str(e)}")
             # Return simple message on error
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     def _register_handlers(self, application):
         """Register event handlers for bot commands and callback queries"""
-        try:
+    try:
             logger.info("Registering command handlers")
             
             # Initialize the application without using run_until_complete
-            try:
+        try:
                 # Instead of using loop.run_until_complete, directly call initialize 
                 # which will be properly awaited by the caller
                 self.init_task = application.initialize()
                 logger.info("Telegram application initialization ready to be awaited")
             except Exception as init_e:
-                logger.error(f"Error during application initialization: {str(init_e)}")
-                logger.exception(init_e)
+            logger.error(f"Error during application initialization: {str(init_e)}")
+            logger.exception(init_e)
                 
             # Set bot commands for menu
             commands = [
@@ -1308,12 +1307,12 @@ class TelegramService:
             ]
             
             # Store the set_commands_task to be awaited later
-            try:
+        try:
                 # Instead of asyncio.create_task, we will await this in the startup event
                 self.set_commands_task = self.bot.set_my_commands(commands)
                 logger.info("Bot commands ready to be set")
             except Exception as cmd_e:
-                logger.error(f"Error preparing bot commands: {str(cmd_e)}")
+            logger.error(f"Error preparing bot commands: {str(cmd_e)}")
             
             # Register command handlers
             application.add_handler(CommandHandler("start", self.start_command))
@@ -1377,9 +1376,9 @@ class TelegramService:
             
             logger.info("Bot setup completed successfully")
             
-        except Exception as e:
-            logger.error(f"Error setting up bot handlers: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error setting up bot handlers: {str(e)}")
+        logger.exception(e)
 
     @property
     def signals_enabled(self):
@@ -1548,7 +1547,7 @@ def setup_logging():
     for key, value in os.environ.items():
         if any(sensitive in key.lower() for sensitive in ['key', 'token', 'secret', 'password', 'pwd']):
             safe_env[key] = f"{value[:3]}...{value[-3:]}" if len(value) > 6 else "[REDACTED]"
-        else:
+    else:
             safe_env[key] = value
     
     logger.debug(f"Environment variables: {json.dumps(safe_env, indent=2)}")
@@ -1556,20 +1555,20 @@ def setup_logging():
     return logger
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
 # Initialize logging early in the application startup
 logger = setup_logging()
@@ -2097,7 +2096,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-        else:
+    else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -2115,7 +2114,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-            else:
+        else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -2156,7 +2155,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-            else:
+        else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -2183,7 +2182,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -2261,7 +2260,7 @@ class TelegramService:
         self.sentiment_cache_ttl = 60 * 60  # 1 hour in seconds
         
         # Start the bot
-        try:
+    try:
             # Check for bot token
             if not self.bot_token:
                 raise ValueError("Missing Telegram bot token")
@@ -2283,13 +2282,13 @@ class TelegramService:
             # Keep track of processed updates
             self.processed_updates = set()
             
-        except Exception as e:
-            logger.error(f"Error initializing Telegram service: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing Telegram service: {str(e)}")
             raise
 
     async def initialize_services(self):
         """Initialize services that require an asyncio event loop"""
-        try:
+    try:
             # Initialize chart service
             await self.chart_service.initialize()
             logger.info("Chart service initialized")
@@ -2307,20 +2306,20 @@ class TelegramService:
                 # Schedule periodic cleanup (every 24 hours)
                 async def periodic_cleanup():
                     while True:
-                        try:
+                    try:
                             # Wait for 24 hours
                             await asyncio.sleep(24 * 60 * 60)
                             # Run cleanup
                             cleaned = await self._cleanup_old_signals(max_age_days=7)
                             logger.info(f"Periodic signal cleanup completed, removed {cleaned} old signals")
-                        except Exception as e:
-                            logger.error(f"Error in periodic signal cleanup: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error in periodic signal cleanup: {str(e)}")
                 
                 # Start the periodic cleanup task
                 asyncio.create_task(periodic_cleanup())
                 logger.info("Scheduled periodic signal cleanup")
-        except Exception as e:
-            logger.error(f"Error initializing services: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing services: {str(e)}")
             raise
             
     # Calendar service helpers
@@ -2347,11 +2346,11 @@ class TelegramService:
 No economic events found for today."
         
         # Sort events by time
-        try:
+    try:
             # Try to parse time for sorting
             def parse_time_for_sorting(event):
                 time_str = event.get('time', '')
-                try:
+            try:
                     # Extract hour and minute if in format like "08:30 EST"
                     if ':' in time_str:
                         parts = time_str.split(' ')[0].split(':')
@@ -2364,7 +2363,7 @@ No economic events found for today."
             
             # Sort the events by time
             sorted_events = sorted(calendar_data, key=parse_time_for_sorting)
-        except Exception as e:
+    except Exception as e:
             self.logger.error(f"Error sorting calendar events: {str(e)}")
             sorted_events = calendar_data
         
@@ -2415,7 +2414,7 @@ No economic events found for today."
     # Utility functions that might be missing
     async def update_message(self, query, text, keyboard=None, parse_mode=ParseMode.HTML):
         """Utility to update a message with error handling"""
-        try:
+    try:
             # Check if the message is too long for Telegram caption limits (1024 chars)
             MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
             MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
@@ -2435,7 +2434,7 @@ No economic events found for today."
                 return True
             # If message is too long even for a text message
             elif len(text) > MAX_MESSAGE_LENGTH:
-                logger.warning(f"Message too long ({len(text)} chars), truncating")
+            logger.warning(f"Message too long ({len(text)} chars), truncating")
                 # Find a good breaking point
                 truncated = text[:MAX_MESSAGE_LENGTH-100]
                 
@@ -2458,7 +2457,7 @@ No economic events found for today."
                     parse_mode=parse_mode
                 )
                 return True
-            else:
+        else:
                 # Normal case - message is within limits
                 # Try to edit message text first
                 await query.edit_message_text(
@@ -2467,16 +2466,16 @@ No economic events found for today."
                     parse_mode=parse_mode
                 )
                 return True
-        except Exception as e:
-            logger.warning(f"Could not update message text: {str(e)}")
+    except Exception as e:
+        logger.warning(f"Could not update message text: {str(e)}")
             
             # If text update fails, try to edit caption
-            try:
+        try:
                 # Check if caption is too long
                 MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
                 
                 if len(text) > MAX_CAPTION_LENGTH:
-                    logger.warning(f"Caption too long ({len(text)} chars), truncating")
+                logger.warning(f"Caption too long ({len(text)} chars), truncating")
                     # Find a good breaking point
                     truncated = text[:MAX_CAPTION_LENGTH-100]
                     
@@ -2498,7 +2497,7 @@ No economic events found for today."
                         reply_markup=keyboard,
                         parse_mode=parse_mode
                     )
-                else:
+            else:
                     # Caption is within limits
                     await query.edit_message_caption(
                         caption=text,
@@ -2507,17 +2506,17 @@ No economic events found for today."
                     )
                 return True
             except Exception as e2:
-                logger.error(f"Could not update caption either: {str(e2)}")
+            logger.error(f"Could not update caption either: {str(e2)}")
                 
                 # As a last resort, send a new message
-                try:
+            try:
                     chat_id = query.message.chat_id
                     
                     # Check if message is too long
                     MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
                     
                     if len(text) > MAX_MESSAGE_LENGTH:
-                        logger.warning(f"New message too long ({len(text)} chars), truncating")
+                    logger.warning(f"New message too long ({len(text)} chars), truncating")
                         # Find a good breaking point
                         truncated = text[:MAX_MESSAGE_LENGTH-100]
                         
@@ -2540,7 +2539,7 @@ No economic events found for today."
                             reply_markup=keyboard,
                             parse_mode=parse_mode
                         )
-                    else:
+                else:
                         # Message is within limits
                         await query.bot.send_message(
                             chat_id=chat_id,
@@ -2550,7 +2549,7 @@ No economic events found for today."
                         )
                     return True
                 except Exception as e3:
-                    logger.error(f"Failed to send new message: {str(e3)}")
+                logger.error(f"Failed to send new message: {str(e3)}")
                     return False
     
     # Missing handler implementations
@@ -2616,7 +2615,7 @@ Manage your trading signals",
         Returns:
             List of subscribed user IDs
         """
-        try:
+    try:
             logger.info(f"Getting subscribers for {instrument} timeframe: {timeframe}")
             
             # Get all subscribers from the database
@@ -2624,7 +2623,7 @@ Manage your trading signals",
             subscribers = await self.db.get_signal_subscriptions(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return []
                 
             # Filter out subscribers that don't have an active subscription
@@ -2640,13 +2639,13 @@ Manage your trading signals",
                 
                 if is_subscribed and not payment_failed:
                     active_subscribers.append(user_id)
-                else:
+            else:
                     logger.info(f"User {user_id} doesn't have an active subscription, skipping signal")
             
             return active_subscribers
             
-        except Exception as e:
-            logger.error(f"Error getting subscribers: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting subscribers: {str(e)}")
             # FOR TESTING: Add admin users if available
             if hasattr(self, 'admin_users') and self.admin_users:
                 logger.info(f"Returning admin users for testing: {self.admin_users}")
@@ -2664,7 +2663,7 @@ Manage your trading signals",
         Returns:
             bool: True if signal was processed successfully, False otherwise
         """
-        try:
+    try:
             # Log the incoming signal data
             logger.info(f"Processing signal: {signal_data}")
             
@@ -2715,13 +2714,13 @@ Manage your trading signals",
                     'take_profit': take_profit,
                     'timeframe': timeframe
                 }
-            else:
-                logger.error(f"Missing required signal data")
+        else:
+            logger.error(f"Missing required signal data")
                 return False
             
             # Basic validation
             if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
-                logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
+            logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
                 return False
                 
             # Create signal ID for tracking
@@ -2749,7 +2748,7 @@ Manage your trading signals",
             
             # FOR TESTING: Always send to admin for testing
             if hasattr(self, 'admin_users') and self.admin_users:
-                try:
+            try:
                     logger.info(f"Sending signal to admin users for testing: {self.admin_users}")
                     for admin_id in self.admin_users:
                         # Prepare keyboard with analysis options
@@ -2775,15 +2774,15 @@ Manage your trading signals",
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
-                except Exception as e:
-                    logger.error(f"Error sending test signal to admin: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending test signal to admin: {str(e)}")
             
             # Get subscribers for this instrument
             timeframe = normalized_data.get('timeframe', '1h')
             subscribers = await self.get_subscribers_for_instrument(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return True  # Successfully processed, just no subscribers
             
             # Send signal to all subscribers
@@ -2791,7 +2790,7 @@ Manage your trading signals",
             
             sent_count = 0
             for user_id in subscribers:
-                try:
+            try:
                     # Prepare keyboard with analysis options
                     keyboard = [
                         [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
@@ -2817,20 +2816,20 @@ Manage your trading signals",
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
                     
-                except Exception as e:
-                    logger.error(f"Error sending signal to user {user_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending signal to user {user_id}: {str(e)}")
             
             logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
             return True
             
-        except Exception as e:
-            logger.error(f"Error processing signal: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error processing signal: {str(e)}")
+        logger.exception(e)
             return False
 
     def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
         """Format signal data into a nice message for Telegram"""
-        try:
+    try:
             # Extract fields from signal data
             instrument = signal_data.get('instrument', 'Unknown')
             direction = signal_data.get('direction', 'Unknown')
@@ -2905,25 +2904,25 @@ Manage your trading signals",
             
             return message
             
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error formatting signal message: {str(e)}")
             # Return simple message on error
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     def _register_handlers(self, application):
         """Register event handlers for bot commands and callback queries"""
-        try:
+    try:
             logger.info("Registering command handlers")
             
             # Initialize the application without using run_until_complete
-            try:
+        try:
                 # Instead of using loop.run_until_complete, directly call initialize 
                 # which will be properly awaited by the caller
                 self.init_task = application.initialize()
                 logger.info("Telegram application initialization ready to be awaited")
             except Exception as init_e:
-                logger.error(f"Error during application initialization: {str(init_e)}")
-                logger.exception(init_e)
+            logger.error(f"Error during application initialization: {str(init_e)}")
+            logger.exception(init_e)
                 
             # Set bot commands for menu
             commands = [
@@ -2933,12 +2932,12 @@ Manage your trading signals",
             ]
             
             # Store the set_commands_task to be awaited later
-            try:
+        try:
                 # Instead of asyncio.create_task, we will await this in the startup event
                 self.set_commands_task = self.bot.set_my_commands(commands)
                 logger.info("Bot commands ready to be set")
             except Exception as cmd_e:
-                logger.error(f"Error preparing bot commands: {str(cmd_e)}")
+            logger.error(f"Error preparing bot commands: {str(cmd_e)}")
             
             # Register command handlers
             application.add_handler(CommandHandler("start", self.start_command))
@@ -3002,9 +3001,9 @@ Manage your trading signals",
             
             logger.info("Bot setup completed successfully")
             
-        except Exception as e:
-            logger.error(f"Error setting up bot handlers: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error setting up bot handlers: {str(e)}")
+        logger.exception(e)
 
     @property
     def signals_enabled(self):
@@ -3018,20 +3017,20 @@ Manage your trading signals",
         logger.info(f"Signal processing is now {'enabled' if value else 'disabled'}")
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
 
 from telegram.error import TelegramError, BadRequest
@@ -3530,7 +3529,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-        else:
+    else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -3548,7 +3547,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-            else:
+        else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -3589,7 +3588,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-            else:
+        else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -3616,7 +3615,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -3694,7 +3693,7 @@ class TelegramService:
         self.sentiment_cache_ttl = 60 * 60  # 1 hour in seconds
         
         # Start the bot
-        try:
+    try:
             # Check for bot token
             if not self.bot_token:
                 raise ValueError("Missing Telegram bot token")
@@ -3716,13 +3715,13 @@ class TelegramService:
             # Keep track of processed updates
             self.processed_updates = set()
             
-        except Exception as e:
-            logger.error(f"Error initializing Telegram service: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing Telegram service: {str(e)}")
             raise
 
     async def initialize_services(self):
         """Initialize services that require an asyncio event loop"""
-        try:
+    try:
             # Initialize chart service
             await self.chart_service.initialize()
             logger.info("Chart service initialized")
@@ -3740,20 +3739,20 @@ class TelegramService:
                 # Schedule periodic cleanup (every 24 hours)
                 async def periodic_cleanup():
                     while True:
-                        try:
+                    try:
                             # Wait for 24 hours
                             await asyncio.sleep(24 * 60 * 60)
                             # Run cleanup
                             cleaned = await self._cleanup_old_signals(max_age_days=7)
                             logger.info(f"Periodic signal cleanup completed, removed {cleaned} old signals")
-                        except Exception as e:
-                            logger.error(f"Error in periodic signal cleanup: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error in periodic signal cleanup: {str(e)}")
                 
                 # Start the periodic cleanup task
                 asyncio.create_task(periodic_cleanup())
                 logger.info("Scheduled periodic signal cleanup")
-        except Exception as e:
-            logger.error(f"Error initializing services: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing services: {str(e)}")
             raise
             
     # Calendar service helpers
@@ -3778,11 +3777,11 @@ class TelegramService:
             return "<b>📅 Economic Calendar</b>\n\nNo economic events found for today."
         
         # Sort events by time
-        try:
+    try:
             # Try to parse time for sorting
             def parse_time_for_sorting(event):
                 time_str = event.get('time', '')
-                try:
+            try:
                     # Extract hour and minute if in format like "08:30 EST"
                     if ':' in time_str:
                         parts = time_str.split(' ')[0].split(':')
@@ -3795,7 +3794,7 @@ class TelegramService:
             
             # Sort the events by time
             sorted_events = sorted(calendar_data, key=parse_time_for_sorting)
-        except Exception as e:
+    except Exception as e:
             self.logger.error(f"Error sorting calendar events: {str(e)}")
             sorted_events = calendar_data
         
@@ -3837,7 +3836,7 @@ class TelegramService:
     # Utility functions that might be missing
     async def update_message(self, query, text, keyboard=None, parse_mode=ParseMode.HTML):
         """Utility to update a message with error handling"""
-        try:
+    try:
             # Check if the message is too long for Telegram caption limits (1024 chars)
             MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
             MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
@@ -3857,7 +3856,7 @@ class TelegramService:
                 return True
             # If message is too long even for a text message
             elif len(text) > MAX_MESSAGE_LENGTH:
-                logger.warning(f"Message too long ({len(text)} chars), truncating")
+            logger.warning(f"Message too long ({len(text)} chars), truncating")
                 # Find a good breaking point
                 truncated = text[:MAX_MESSAGE_LENGTH-100]
                 
@@ -3876,7 +3875,7 @@ class TelegramService:
                     parse_mode=parse_mode
                 )
                 return True
-            else:
+        else:
                 # Normal case - message is within limits
                 # Try to edit message text first
                 await query.edit_message_text(
@@ -3885,16 +3884,16 @@ class TelegramService:
                     parse_mode=parse_mode
                 )
                 return True
-        except Exception as e:
-            logger.warning(f"Could not update message text: {str(e)}")
+    except Exception as e:
+        logger.warning(f"Could not update message text: {str(e)}")
             
             # If text update fails, try to edit caption
-            try:
+        try:
                 # Check if caption is too long
                 MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
                 
                 if len(text) > MAX_CAPTION_LENGTH:
-                    logger.warning(f"Caption too long ({len(text)} chars), truncating")
+                logger.warning(f"Caption too long ({len(text)} chars), truncating")
                     # Find a good breaking point
                     truncated = text[:MAX_CAPTION_LENGTH-100]
                     
@@ -3912,7 +3911,7 @@ class TelegramService:
                         reply_markup=keyboard,
                         parse_mode=parse_mode
                     )
-                else:
+            else:
                     # Caption is within limits
                     await query.edit_message_caption(
                         caption=text,
@@ -3921,17 +3920,17 @@ class TelegramService:
                     )
                 return True
             except Exception as e2:
-                logger.error(f"Could not update caption either: {str(e2)}")
+            logger.error(f"Could not update caption either: {str(e2)}")
                 
                 # As a last resort, send a new message
-                try:
+            try:
                     chat_id = query.message.chat_id
                     
                     # Check if message is too long
                     MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
                     
                     if len(text) > MAX_MESSAGE_LENGTH:
-                        logger.warning(f"New message too long ({len(text)} chars), truncating")
+                    logger.warning(f"New message too long ({len(text)} chars), truncating")
                         # Find a good breaking point
                         truncated = text[:MAX_MESSAGE_LENGTH-100]
                         
@@ -3950,7 +3949,7 @@ class TelegramService:
                             reply_markup=keyboard,
                             parse_mode=parse_mode
                         )
-                    else:
+                else:
                         # Message is within limits
                         await query.bot.send_message(
                             chat_id=chat_id,
@@ -3960,7 +3959,7 @@ class TelegramService:
                         )
                     return True
                 except Exception as e3:
-                    logger.error(f"Failed to send new message: {str(e3)}")
+                logger.error(f"Failed to send new message: {str(e3)}")
                     return False
     
     # Missing handler implementations
@@ -4024,7 +4023,7 @@ class TelegramService:
         Returns:
             List of subscribed user IDs
         """
-        try:
+    try:
             logger.info(f"Getting subscribers for {instrument} timeframe: {timeframe}")
             
             # Get all subscribers from the database
@@ -4032,7 +4031,7 @@ class TelegramService:
             subscribers = await self.db.get_signal_subscriptions(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return []
                 
             # Filter out subscribers that don't have an active subscription
@@ -4048,13 +4047,13 @@ class TelegramService:
                 
                 if is_subscribed and not payment_failed:
                     active_subscribers.append(user_id)
-                else:
+            else:
                     logger.info(f"User {user_id} doesn't have an active subscription, skipping signal")
             
             return active_subscribers
             
-        except Exception as e:
-            logger.error(f"Error getting subscribers: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting subscribers: {str(e)}")
             # FOR TESTING: Add admin users if available
             if hasattr(self, 'admin_users') and self.admin_users:
                 logger.info(f"Returning admin users for testing: {self.admin_users}")
@@ -4072,7 +4071,7 @@ class TelegramService:
         Returns:
             bool: True if signal was processed successfully, False otherwise
         """
-        try:
+    try:
             # Log the incoming signal data
             logger.info(f"Processing signal: {signal_data}")
             
@@ -4123,13 +4122,13 @@ class TelegramService:
                     'take_profit': take_profit,
                     'timeframe': timeframe
                 }
-            else:
-                logger.error(f"Missing required signal data")
+        else:
+            logger.error(f"Missing required signal data")
                 return False
             
             # Basic validation
             if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
-                logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
+            logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
                 return False
                 
             # Create signal ID for tracking
@@ -4157,7 +4156,7 @@ class TelegramService:
             
             # FOR TESTING: Always send to admin for testing
             if hasattr(self, 'admin_users') and self.admin_users:
-                try:
+            try:
                     logger.info(f"Sending signal to admin users for testing: {self.admin_users}")
                     for admin_id in self.admin_users:
                         # Prepare keyboard with analysis options
@@ -4183,15 +4182,15 @@ class TelegramService:
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
-                except Exception as e:
-                    logger.error(f"Error sending test signal to admin: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending test signal to admin: {str(e)}")
             
             # Get subscribers for this instrument
             timeframe = normalized_data.get('timeframe', '1h')
             subscribers = await self.get_subscribers_for_instrument(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return True  # Successfully processed, just no subscribers
             
             # Send signal to all subscribers
@@ -4199,7 +4198,7 @@ class TelegramService:
             
             sent_count = 0
             for user_id in subscribers:
-                try:
+            try:
                     # Prepare keyboard with analysis options
                     keyboard = [
                         [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
@@ -4225,20 +4224,20 @@ class TelegramService:
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
                     
-                except Exception as e:
-                    logger.error(f"Error sending signal to user {user_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending signal to user {user_id}: {str(e)}")
             
             logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
             return True
             
-        except Exception as e:
-            logger.error(f"Error processing signal: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error processing signal: {str(e)}")
+        logger.exception(e)
             return False
 
     def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
         """Format signal data into a nice message for Telegram"""
-        try:
+    try:
             # Extract fields from signal data
             instrument = signal_data.get('instrument', 'Unknown')
             direction = signal_data.get('direction', 'Unknown')
@@ -4289,25 +4288,25 @@ class TelegramService:
             
             return message
             
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error formatting signal message: {str(e)}")
             # Return simple message on error
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     def _register_handlers(self, application):
         """Register event handlers for bot commands and callback queries"""
-        try:
+    try:
             logger.info("Registering command handlers")
             
             # Initialize the application without using run_until_complete
-            try:
+        try:
                 # Instead of using loop.run_until_complete, directly call initialize 
                 # which will be properly awaited by the caller
                 self.init_task = application.initialize()
                 logger.info("Telegram application initialization ready to be awaited")
             except Exception as init_e:
-                logger.error(f"Error during application initialization: {str(init_e)}")
-                logger.exception(init_e)
+            logger.error(f"Error during application initialization: {str(init_e)}")
+            logger.exception(init_e)
                 
             # Set bot commands for menu
             commands = [
@@ -4317,12 +4316,12 @@ class TelegramService:
             ]
             
             # Store the set_commands_task to be awaited later
-            try:
+        try:
                 # Instead of asyncio.create_task, we will await this in the startup event
                 self.set_commands_task = self.bot.set_my_commands(commands)
                 logger.info("Bot commands ready to be set")
             except Exception as cmd_e:
-                logger.error(f"Error preparing bot commands: {str(cmd_e)}")
+            logger.error(f"Error preparing bot commands: {str(cmd_e)}")
             
             # Register command handlers
             application.add_handler(CommandHandler("start", self.start_command))
@@ -4386,9 +4385,9 @@ class TelegramService:
             
             logger.info("Bot setup completed successfully")
             
-        except Exception as e:
-            logger.error(f"Error setting up bot handlers: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error setting up bot handlers: {str(e)}")
+        logger.exception(e)
 
     @property
     def signals_enabled(self):
@@ -4408,7 +4407,7 @@ class TelegramService:
         first_name = user.first_name
         
         # Try to add the user to the database if they don't exist yet
-        try:
+    try:
             # Get user subscription since we can't check if user exists directly
             existing_subscription = await self.db.get_user_subscription(user_id)
             
@@ -4416,11 +4415,11 @@ class TelegramService:
                 # Add new user
                 logger.info(f"New user started: {user_id}, {first_name}")
                 await self.db.save_user(user_id, first_name, None, user.username)
-            else:
+        else:
                 logger.info(f"Existing user started: {user_id}, {first_name}")
                 
-        except Exception as e:
-            logger.error(f"Error registering user: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}")
         
         # Check if the user has a subscription 
         is_subscribed = await self.db.is_user_subscribed(user_id)
@@ -4458,7 +4457,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.HTML
             )
-        else:
+    else:
             # Show the welcome message with trial option from the screenshot
             welcome_text = """
 🚀 Welcome to Sigmapips AI! 🚀
@@ -4498,7 +4497,7 @@ Start today with a FREE 14-day trial!
             # Gebruik de juiste welkomst-GIF URL
             welcome_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
             
-            try:
+        try:
                 # Send the GIF with caption containing the welcome message
                 await update.message.reply_animation(
                     animation=welcome_gif_url,
@@ -4506,8 +4505,8 @@ Start today with a FREE 14-day trial!
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
-            except Exception as e:
-                logger.error(f"Error sending welcome GIF with caption: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error sending welcome GIF with caption: {str(e)}")
                 # Fallback to text-only message if GIF fails
                 await update.message.reply_text(
                     text=welcome_text,
@@ -4533,18 +4532,18 @@ Start today with a FREE 14-day trial!
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-            else:
+        else:
                 message = f"❌ Could not set payment failed status for user {chat_id}"
-                logger.error("Database returned failure")
+            logger.error("Database returned failure")
                 await update.message.reply_text(message)
                 
         except ValueError as e:
             error_msg = f"Invalid argument. Chat ID must be a number. Error: {str(e)}"
-            logger.error(error_msg)
+        logger.error(error_msg)
             await update.message.reply_text(error_msg)
-        except Exception as e:
+    except Exception as e:
             error_msg = f"Error setting payment failed status: {str(e)}"
-            logger.error(error_msg)
+        logger.error(error_msg)
             await update.message.reply_text(error_msg)
 
     async def menu_analyse_callback(self, update: Update, context=None) -> int:
@@ -4556,7 +4555,7 @@ Start today with a FREE 14-day trial!
         gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
         
         # Probeer eerst het huidige bericht te verwijderen en een nieuw bericht te sturen met de analyse GIF
-        try:
+    try:
             await query.message.delete()
             await context.bot.send_animation(
                 chat_id=update.effective_chat.id,
@@ -4567,10 +4566,10 @@ Start today with a FREE 14-day trial!
             )
             return CHOOSE_ANALYSIS
         except Exception as delete_error:
-            logger.warning(f"Could not delete message: {str(delete_error)}")
+        logger.warning(f"Could not delete message: {str(delete_error)}")
             
             # Als verwijderen mislukt, probeer de media te updaten
-            try:
+        try:
                 await query.edit_message_media(
                     media=InputMediaAnimation(
                         media=gif_url,
@@ -4580,10 +4579,10 @@ Start today with a FREE 14-day trial!
                 )
                 return CHOOSE_ANALYSIS
             except Exception as media_error:
-                logger.warning(f"Could not update media: {str(media_error)}")
+            logger.warning(f"Could not update media: {str(media_error)}")
                 
                 # Als media update mislukt, probeer tekst te updaten
-                try:
+            try:
                     await query.edit_message_text(
                         text="Select your analysis type:",
                         reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
@@ -4592,14 +4591,14 @@ Start today with a FREE 14-day trial!
                 except Exception as text_error:
                     # Als tekst updaten mislukt, probeer bijschrift te updaten
                     if "There is no text in the message to edit" in str(text_error):
-                        try:
+                    try:
                             await query.edit_message_caption(
                                 caption="Select your analysis type:",
                                 reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
                                 parse_mode=ParseMode.HTML
                             )
                         except Exception as caption_error:
-                            logger.error(f"Failed to update caption: {str(caption_error)}")
+                        logger.error(f"Failed to update caption: {str(caption_error)}")
                             # Laatste redmiddel: stuur een nieuw bericht
                             await context.bot.send_animation(
                                 chat_id=update.effective_chat.id,
@@ -4608,8 +4607,8 @@ Start today with a FREE 14-day trial!
                                 reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
                                 parse_mode=ParseMode.HTML
                             )
-                    else:
-                        logger.error(f"Failed to update message: {str(text_error)}")
+                else:
+                    logger.error(f"Failed to update message: {str(text_error)}")
                         # Laatste redmiddel: stuur een nieuw bericht
                         await context.bot.send_animation(
                             chat_id=update.effective_chat.id,
@@ -4640,12 +4639,12 @@ Start today with a FREE 14-day trial!
             
             # If we should show the GIF
             if not skip_gif:
-                try:
+            try:
                     # For message commands we can use reply_animation
                     if hasattr(update, 'message') and update.message:
                         # Verwijder eventuele vorige berichten met callback query
                         if hasattr(update, 'callback_query') and update.callback_query:
-                            try:
+                        try:
                                 await update.callback_query.message.delete()
                             except Exception:
                                 pass
@@ -4657,10 +4656,10 @@ Start today with a FREE 14-day trial!
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-                    else:
+                else:
                         # Voor callback_query, verwijder huidige bericht en stuur nieuw bericht
                         if hasattr(update, 'callback_query') and update.callback_query:
-                            try:
+                        try:
                                 # Verwijder het huidige bericht
                                 await update.callback_query.message.delete()
                                 
@@ -4672,15 +4671,15 @@ Start today with a FREE 14-day trial!
                                     parse_mode=ParseMode.HTML,
                                     reply_markup=reply_markup
                                 )
-                            except Exception as e:
-                                logger.error(f"Failed to handle callback query: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"Failed to handle callback query: {str(e)}")
                                 # Valt terug op tekstwijziging als verwijderen niet lukt
                                 await update.callback_query.edit_message_text(
                                     text=WELCOME_MESSAGE,
                                     parse_mode=ParseMode.HTML,
                                     reply_markup=reply_markup
                                 )
-                        else:
+                    else:
                             # Final fallback - try to send a new message
                             await bot.send_animation(
                                 chat_id=update.effective_chat.id,
@@ -4689,8 +4688,8 @@ Start today with a FREE 14-day trial!
                                 parse_mode=ParseMode.HTML,
                                 reply_markup=reply_markup
                             )
-                except Exception as e:
-                    logger.error(f"Failed to send menu GIF: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to send menu GIF: {str(e)}")
                     # Fallback to text-only approach
                     if hasattr(update, 'message') and update.message:
                         await update.message.reply_text(
@@ -4698,14 +4697,14 @@ Start today with a FREE 14-day trial!
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-                    else:
+                else:
                         await bot.send_message(
                             chat_id=update.effective_chat.id,
                             text=WELCOME_MESSAGE,
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-            else:
+        else:
                 # Skip GIF mode - just send text
                 if hasattr(update, 'message') and update.message:
                     await update.message.reply_text(
@@ -4713,14 +4712,14 @@ Start today with a FREE 14-day trial!
                         parse_mode=ParseMode.HTML,
                         reply_markup=reply_markup
                     )
-                else:
+            else:
                     await bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=WELCOME_MESSAGE,
                         parse_mode=ParseMode.HTML,
                         reply_markup=reply_markup
                     )
-        else:
+    else:
             # Handle non-subscribed users similar to start command
             await self.start_command(update, context)
             
@@ -4765,7 +4764,7 @@ Start today with a FREE 14-day trial!
             return await self.show_technical_analysis(update, context, instrument=instrument)
         
         # Show the market selection menu
-        try:
+    try:
             # First try to edit message text
             await query.edit_message_text(
                 text="Select market for technical analysis:",
@@ -4774,21 +4773,21 @@ Start today with a FREE 14-day trial!
         except Exception as text_error:
             # If that fails due to caption, try editing caption
             if "There is no text in the message to edit" in str(text_error):
-                try:
+            try:
                     await query.edit_message_caption(
                         caption="Select market for technical analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-                except Exception as e:
-                    logger.error(f"Failed to update caption in analysis_technical_callback: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to update caption in analysis_technical_callback: {str(e)}")
                     # Try to send a new message as last resort
                     await query.message.reply_text(
                         text="Select market for technical analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-            else:
+        else:
                 # Re-raise for other errors
                 raise
         
@@ -4826,7 +4825,7 @@ Start today with a FREE 14-day trial!
             return await self.show_sentiment_analysis(update, context, instrument=instrument)
             
         # Show the market selection menu
-        try:
+    try:
             # First try to edit message text
             await query.edit_message_text(
                 text="Select market for sentiment analysis:",
@@ -4835,21 +4834,21 @@ Start today with a FREE 14-day trial!
         except Exception as text_error:
             # If that fails due to caption, try editing caption
             if "There is no text in the message to edit" in str(text_error):
-                try:
+            try:
                     await query.edit_message_caption(
                         caption="Select market for sentiment analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-                except Exception as e:
-                    logger.error(f"Failed to update caption in analysis_sentiment_callback: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to update caption in analysis_sentiment_callback: {str(e)}")
                     # Try to send a new message as last resort
                     await query.message.reply_text(
                         text="Select market for sentiment analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-            else:
+        else:
                 # Re-raise for other errors
                 raise
         
@@ -4892,7 +4891,7 @@ Start today with a FREE 14-day trial!
 
     async def show_economic_calendar(self, update: Update, context: CallbackContext, currency=None, loading_message=None):
         """Show the economic calendar for a specific currency"""
-        try:
+    try:
             # VERIFICATION MARKER: SIGMAPIPS_CALENDAR_FIX_APPLIED
             self.logger.info("VERIFICATION MARKER: SIGMAPIPS_CALENDAR_FIX_APPLIED")
             
@@ -4912,7 +4911,7 @@ Start today with a FREE 14-day trial!
             if tavily_api_key:
                 masked_key = f"{tavily_api_key[:4]}..." if len(tavily_api_key) > 7 else "***"
                 self.logger.info(f"Tavily API key is available: {masked_key}")
-            else:
+        else:
                 self.logger.warning("No Tavily API key found, will use mock data")
             
             # Get calendar data for ALL major currencies, regardless of the supplied parameter
@@ -4921,13 +4920,13 @@ Start today with a FREE 14-day trial!
             calendar_data = []
             
             # Get all currencies data
-            try:
+        try:
                 if hasattr(calendar_service, 'get_calendar'):
                     calendar_data = await calendar_service.get_calendar()
-                else:
+            else:
                     self.logger.warning("calendar_service.get_calendar method not available, using mock data")
                     calendar_data = []
-            except Exception as e:
+        except Exception as e:
                 self.logger.warning(f"Error getting calendar data: {str(e)}")
                 calendar_data = []
             
@@ -4940,7 +4939,7 @@ Start today with a FREE 14-day trial!
                 # Use the mock data generator from the calendar service if available
                 if hasattr(calendar_service, '_generate_mock_calendar_data'):
                     mock_data = calendar_service._generate_mock_calendar_data(MAJOR_CURRENCIES, today_date)
-                else:
+            else:
                     # Otherwise use our own implementation
                     mock_data = self._generate_mock_calendar_data(MAJOR_CURRENCIES, today_date)
                 
@@ -4962,11 +4961,11 @@ Start today with a FREE 14-day trial!
             # Format the calendar data in chronological order
             if hasattr(self, '_format_calendar_events'):
                 message = await self._format_calendar_events(calendar_data)
-            else:
+        else:
                 # Fallback to calendar service formatting if the method doesn't exist on TelegramService
                 if hasattr(calendar_service, '_format_calendar_response'):
                     message = await calendar_service._format_calendar_response(calendar_data, "ALL")
-                else:
+            else:
                     # Simple formatting fallback
                     message = "<b>📅 Economic Calendar</b>\n\n"
                     for event in calendar_data[:10]:  # Limit to first 10 events
@@ -4979,19 +4978,19 @@ Start today with a FREE 14-day trial!
             keyboard = None
             if context and hasattr(context, 'user_data') and context.user_data.get('from_signal', False):
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back_to_signal_analysis")]])
-            else:
+        else:
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_analyse")]])
             
             # Try to delete loading message first if it exists
             if loading_message:
-                try:
+            try:
                     await loading_message.delete()
                     self.logger.info("Successfully deleted loading message")
                 except Exception as delete_error:
                     self.logger.warning(f"Could not delete loading message: {str(delete_error)}")
                     
                     # If deletion fails, try to edit it
-                    try:
+                try:
                         await context.bot.edit_message_text(
                             chat_id=chat_id,
                             message_id=loading_message.message_id,
@@ -5013,7 +5012,7 @@ Start today with a FREE 14-day trial!
             )
             self.logger.info("Sent calendar data as new message")
         
-        except Exception as e:
+    except Exception as e:
             self.logger.error(f"Error showing economic calendar: {str(e)}")
             self.logger.exception(e)
             
@@ -5139,7 +5138,7 @@ Start today with a FREE 14-day trial!
             
             loading_message = None
             
-            try:
+        try:
                 # Try to update with animated GIF first (best visual experience)
                 await query.edit_message_media(
                     media=InputMediaAnimation(
@@ -5149,10 +5148,10 @@ Start today with a FREE 14-day trial!
                 )
                 logger.info(f"Successfully showed loading GIF for {instrument}")
             except Exception as media_error:
-                logger.warning(f"Could not update with GIF: {str(media_error)}")
+            logger.warning(f"Could not update with GIF: {str(media_error)}")
                 
                 # If GIF fails, try to update the text
-                try:
+            try:
                     loading_message = await query.edit_message_text(
                         text=loading_text
                     )
@@ -5163,18 +5162,18 @@ Start today with a FREE 14-day trial!
                         logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
                         context.user_data['loading_message'] = loading_message
                 except Exception as text_error:
-                    logger.warning(f"Could not update text: {str(text_error)}")
+                logger.warning(f"Could not update text: {str(text_error)}")
                     
                     # If text update fails, try to update caption
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption=loading_text
                         )
                     except Exception as caption_error:
-                        logger.warning(f"Could not update caption: {str(caption_error)}")
+                    logger.warning(f"Could not update caption: {str(caption_error)}")
                         
                         # Last resort - send a new message with loading GIF
-                        try:
+                    try:
                             from trading_bot.services.telegram_service.gif_utils import send_loading_gif
                             await send_loading_gif(
                                 self.bot,
@@ -5182,13 +5181,13 @@ Start today with a FREE 14-day trial!
                                 caption=f"⏳ <b>Analyzing technical data for {instrument}...</b>"
                             )
                         except Exception as gif_error:
-                            logger.warning(f"Could not show loading GIF: {str(gif_error)}")
+                        logger.warning(f"Could not show loading GIF: {str(gif_error)}")
             
             # Show technical analysis for this instrument
             return await self.show_technical_analysis(update, context, instrument=instrument)
-        else:
+    else:
             # Error handling - go back to signal analysis menu
-            try:
+        try:
                 # First try to edit message text
                 await query.edit_message_text(
                     text="Could not find the instrument. Please try again.",
@@ -5197,21 +5196,21 @@ Start today with a FREE 14-day trial!
             except Exception as text_error:
                 # If that fails due to caption, try editing caption
                 if "There is no text in the message to edit" in str(text_error):
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-                    except Exception as e:
-                        logger.error(f"Failed to update caption in signal_technical_callback: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to update caption in signal_technical_callback: {str(e)}")
                         # Try to send a new message as last resort
                         await query.message.reply_text(
                             text="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-                else:
+            else:
                     # Re-raise for other errors
                     raise
             return CHOOSE_ANALYSIS
@@ -5267,7 +5266,7 @@ Start today with a FREE 14-day trial!
             loading_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
             loading_text = f"Loading sentiment analysis for {instrument}..."
             
-            try:
+        try:
                 # Try to update with animated GIF first (best visual experience)
                 await query.edit_message_media(
                     media=InputMediaAnimation(
@@ -5277,10 +5276,10 @@ Start today with a FREE 14-day trial!
                 )
                 logger.info(f"Successfully showed loading GIF for {instrument} sentiment analysis")
             except Exception as media_error:
-                logger.warning(f"Could not update with GIF: {str(media_error)}")
+            logger.warning(f"Could not update with GIF: {str(media_error)}")
                 
                 # If GIF fails, try to update the text
-                try:
+            try:
                     loading_message = await query.edit_message_text(
                         text=loading_text
                     )
@@ -5291,18 +5290,18 @@ Start today with a FREE 14-day trial!
                         logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
                         context.user_data['loading_message'] = loading_message
                 except Exception as text_error:
-                    logger.warning(f"Could not update text: {str(text_error)}")
+                logger.warning(f"Could not update text: {str(text_error)}")
                     
                     # If text update fails, try to update caption
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption=loading_text
                         )
                     except Exception as caption_error:
-                        logger.warning(f"Could not update caption: {str(caption_error)}")
+                    logger.warning(f"Could not update caption: {str(caption_error)}")
                         
                         # Last resort - send a new message with loading GIF
-                        try:
+                    try:
                             from trading_bot.services.telegram_service.gif_utils import send_loading_gif
                             await send_loading_gif(
                                 self.bot,
@@ -5310,13 +5309,13 @@ Start today with a FREE 14-day trial!
                                 caption=f"⏳ <b>Analyzing market sentiment for {instrument}...</b>"
                             )
                         except Exception as gif_error:
-                            logger.warning(f"Could not show loading GIF: {str(gif_error)}")
+                        logger.warning(f"Could not show loading GIF: {str(gif_error)}")
             
             # Show sentiment analysis for this instrument
             return await self.show_sentiment_analysis(update, context, instrument=instrument)
-        else:
+    else:
             # Error handling - go back to signal analysis menu
-            try:
+        try:
                 # First try to edit message text
                 await query.edit_message_text(
                     text="Could not find the instrument. Please try again.",
@@ -5325,21 +5324,21 @@ Start today with a FREE 14-day trial!
             except Exception as text_error:
                 # If that fails due to caption, try editing caption
                 if "There is no text in the message to edit" in str(text_error):
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-                    except Exception as e:
-                        logger.error(f"Failed to update caption in signal_sentiment_callback: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to update caption in signal_sentiment_callback: {str(e)}")
                         # Try to send a new message as last resort
                         await query.message.reply_text(
                             text="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-            else:
+        else:
                 # Re-raise for other errors
                 raise
         return CHOOSE_ANALYSIS
@@ -5424,7 +5423,7 @@ Start today with a FREE 14-day trial!
         loading_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
         loading_text = f"Loading economic calendar..."
         
-        try:
+    try:
             # Try to update with animated GIF first (best visual experience)
             await query.edit_message_media(
                 media=InputMediaAnimation(
@@ -5434,10 +5433,10 @@ Start today with a FREE 14-day trial!
             )
             logger.info(f"Successfully showed loading GIF for economic calendar")
         except Exception as media_error:
-            logger.warning(f"Could not update with GIF: {str(media_error)}")
+        logger.warning(f"Could not update with GIF: {str(media_error)}")
             
             # If GIF fails, try to update the text
-            try:
+        try:
                 loading_message = await query.edit_message_text(
                     text=loading_text
                 )
@@ -5448,18 +5447,18 @@ Start today with a FREE 14-day trial!
                     logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
                     context.user_data['loading_message'] = loading_message
             except Exception as text_error:
-                logger.warning(f"Could not update text: {str(text_error)}")
+            logger.warning(f"Could not update text: {str(text_error)}")
                 
                 # If text update fails, try to update caption
-                try:
+            try:
                     await query.edit_message_caption(
                         caption=loading_text
                     )
                 except Exception as caption_error:
-                    logger.warning(f"Could not update caption: {str(caption_error)}")
+                logger.warning(f"Could not update caption: {str(caption_error)}")
                     
                     # Last resort - send a new message with loading GIF
-                    try:
+                try:
                         from trading_bot.services.telegram_service.gif_utils import send_loading_gif
                         await send_loading_gif(
                             self.bot,
@@ -5467,7 +5466,7 @@ Start today with a FREE 14-day trial!
                             caption=f"⏳ <b>Loading economic calendar...</b>"
                         )
                     except Exception as gif_error:
-                        logger.warning(f"Could not show loading GIF: {str(gif_error)}")
+                    logger.warning(f"Could not show loading GIF: {str(gif_error)}")
         
         # Show calendar analysis for ALL major currencies
         return await self.show_calendar_analysis(update, context, instrument=None)
@@ -5477,7 +5476,7 @@ Start today with a FREE 14-day trial!
         query = update.callback_query
         await query.answer()
         
-        try:
+    try:
             # Get the current signal being viewed
             user_id = update.effective_user.id
             user_str_id = str(user_id)
@@ -5561,8 +5560,8 @@ Start today with a FREE 14-day trial!
                     matching_signals.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
                     signal_id, signal_data = matching_signals[0]
                     logger.info(f"Found matching signal with ID: {signal_id}")
-                else:
-                    logger.warning(f"No matching signals found for instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}")
+            else:
+                logger.warning(f"No matching signals found for instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}")
                     # If no exact match, try with just the instrument
                     matching_signals = []
                     for sig_id, sig in user_signal_dict.items():
@@ -5577,7 +5576,7 @@ Start today with a FREE 14-day trial!
             # If still no signal data, try to get from database
             if not signal_data and signal_instrument and hasattr(self, 'db') and self.db:
                 logger.info(f"Trying to retrieve signals for instrument {signal_instrument} from database")
-                try:
+            try:
                     signals = await self.db.get_user_signals(user_id, signal_instrument)
                     if signals and len(signals) > 0:
                         # Use the most recent signal
@@ -5594,7 +5593,7 @@ Start today with a FREE 14-day trial!
                             
                         self.user_signals[user_str_id][signal_id] = signal_data
                 except Exception as db_error:
-                    logger.error(f"Error retrieving signals from database: {str(db_error)}")
+                logger.error(f"Error retrieving signals from database: {str(db_error)}")
             
             if not signal_data:
                 # Fallback message if signal not found
@@ -5622,12 +5621,12 @@ Start today with a FREE 14-day trial!
             
             return SIGNAL_DETAILS
             
-        except Exception as e:
-            logger.error(f"Error in back_to_signal_callback: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error in back_to_signal_callback: {str(e)}")
+        logger.exception(e)
             
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -5655,11 +5654,11 @@ Start today with a FREE 14-day trial!
             
             return SIGNAL_DETAILS
             
-        except Exception as e:
-            logger.error(f"Error in back_to_signal_callback: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in back_to_signal_callback: {str(e)}")
             
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -5676,7 +5675,7 @@ Start today with a FREE 14-day trial!
         await query.answer()
         logger.info(f"analyze_from_signal_callback called with data: {query.data}")
         
-        try:
+    try:
             # Extract signal information from callback data
             parts = query.data.split('_')
             
@@ -5738,19 +5737,19 @@ Select the type of analysis you want to perform:",
                 )
                 
                 return CHOOSE_ANALYSIS
-            else:
+        else:
                 # Invalid callback data
                 await query.edit_message_text(
                     text="Invalid signal format. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
                 )
                 return MENU
-        except Exception as e:
-            logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
+        logger.exception(e)
             
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -5758,10 +5757,10 @@ Select the type of analysis you want to perform:",
             except Exception:
                 pass
             return MENU
-        except Exception as e:
-            logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -5772,8 +5771,8 @@ Select the type of analysis you want to perform:",
 
     async def _store_original_signal_page(self, update: Update, context: ContextTypes.DEFAULT_TYPE, instrument: str, signal_id: str):
         """Store the original signal page data for later retrieval"""
-        try:
-            # Fetch the signal data from the database
+    try:
+        # Fetch the signal data from the database
             signal_data = await self.db.get_user_signals(update.effective_user.id, instrument)
             
             if signal_data:
@@ -5789,69 +5788,69 @@ Select the type of analysis you want to perform:",
                 await self.db.save_signal_page(update.effective_user.id, instrument, signal_page_data)
                 
                 logger.info(f"Original signal page data stored for {instrument} with signal ID {signal_id}")
-            else:
-                logger.warning(f"No signal data found for {instrument} with signal ID {signal_id}")
-        except Exception as e:
-            logger.error(f"Error storing original signal page: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No signal data found for {instrument} with signal ID {signal_id}")
+    except Exception as e:
+        logger.error(f"Error storing original signal page: {str(e)}")
+        logger.exception(e)
 
     async def _get_original_signal_page(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Retrieve the original signal page data for a given signal"""
-        try:
-            # Fetch the signal page data from the database
+    try:
+        # Fetch the signal page data from the database
             signal_page_data = await self.db.get_signal_page(update.effective_user.id, update.callback_query.data.split('_')[3])
             
             if signal_page_data:
                 return signal_page_data
-            else:
-                logger.warning(f"No signal page data found for signal ID {update.callback_query.data.split('_')[3]}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving original signal page: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No signal page data found for signal ID {update.callback_query.data.split('_')[3]}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving original signal page: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _load_signals(self):
         """Load signals from the database"""
-        try:
-            # Fetch all signals from the database
+    try:
+        # Fetch all signals from the database
             signals = await self.db.get_all_signals()
             
             if signals:
                 for signal in signals:
                     self.user_signals[str(signal['user_id'])] = {signal['id']: signal}
                 logger.info(f"Loaded {len(signals)} signals from the database")
-            else:
+        else:
                 logger.info("No signals found in the database")
-        except Exception as e:
-            logger.error(f"Error loading signals: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error loading signals: {str(e)}")
+        logger.exception(e)
 
     async def _cleanup_old_signals(self, max_age_days):
         """Cleanup old signals from the database"""
-        try:
+    try:
             # Calculate the date threshold
             threshold_date = datetime.now() - timedelta(days=max_age_days)
             
-            # Fetch signals older than the threshold date
+        # Fetch signals older than the threshold date
             signals_to_delete = await self.db.get_old_signals(threshold_date)
             
             if signals_to_delete:
                 for signal in signals_to_delete:
                     await self.db.delete_signal(signal['id'])
                 logger.info(f"Deleted {len(signals_to_delete)} old signals from the database")
-            else:
+        else:
                 logger.info("No old signals found to delete")
             
             return len(signals_to_delete)
-        except Exception as e:
-            logger.error(f"Error cleaning up old signals: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error cleaning up old signals: {str(e)}")
+        logger.exception(e)
             return 0
 
     async def _format_signal_message(self, signal_data):
         """Format the signal message for display"""
-        try:
+    try:
             # Extract fields from signal data
             instrument = signal_data.get('instrument', 'Unknown')
             direction = signal_data.get('direction', 'Unknown')
@@ -5901,234 +5900,234 @@ Select the type of analysis you want to perform:",
             message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
             
             return message
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error formatting signal message: {str(e)}")
+        logger.exception(e)
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     async def _get_signal_details(self, signal_id):
         """Retrieve signal details from the database"""
-        try:
-            # Fetch the signal data from the database
+    try:
+        # Fetch the signal data from the database
             signal_data = await self.db.get_signal(signal_id)
             
             if signal_data:
                 return signal_data
-            else:
-                logger.warning(f"No signal data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal details: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No signal data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal details: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_analysis(self, signal_id):
         """Retrieve signal analysis from the database"""
-        try:
-            # Fetch the signal analysis data from the database
+    try:
+        # Fetch the signal analysis data from the database
             analysis_data = await self.db.get_signal_analysis(signal_id)
             
             if analysis_data:
                 return analysis_data
-            else:
-                logger.warning(f"No analysis data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal analysis: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No analysis data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal analysis: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_sentiment(self, signal_id):
         """Retrieve signal sentiment from the database"""
-        try:
-            # Fetch the signal sentiment data from the database
+    try:
+        # Fetch the signal sentiment data from the database
             sentiment_data = await self.db.get_signal_sentiment(signal_id)
             
             if sentiment_data:
                 return sentiment_data
-            else:
-                logger.warning(f"No sentiment data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal sentiment: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No sentiment data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal sentiment: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_calendar(self, signal_id):
         """Retrieve signal calendar data from the database"""
-        try:
-            # Fetch the signal calendar data from the database
+    try:
+        # Fetch the signal calendar data from the database
             calendar_data = await self.db.get_signal_calendar(signal_id)
             
             if calendar_data:
                 return calendar_data
-            else:
-                logger.warning(f"No calendar data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal calendar: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No calendar data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal calendar: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_market(self, signal_id):
         """Retrieve signal market data from the database"""
-        try:
-            # Fetch the signal market data from the database
+    try:
+        # Fetch the signal market data from the database
             market_data = await self.db.get_signal_market(signal_id)
             
             if market_data:
                 return market_data
-            else:
-                logger.warning(f"No market data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal market: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No market data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal market: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_trades(self, signal_id):
         """Retrieve signal trades from the database"""
-        try:
-            # Fetch the signal trades data from the database
-            trades_data = await self.db.get_signal_trades(signal_id)
+    try:
+        # Fetch the signal trades data from the database
+        trades_data = await self.db.get_signal_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_comments(self, signal_id):
         """Retrieve signal comments from the database"""
-        try:
-            # Fetch the signal comments data from the database
+    try:
+        # Fetch the signal comments data from the database
             comments_data = await self.db.get_signal_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_attachments(self, signal_id):
         """Retrieve signal attachments from the database"""
-        try:
-            # Fetch the signal attachments data from the database
+    try:
+        # Fetch the signal attachments data from the database
             attachments_data = await self.db.get_signal_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_notes(self, signal_id):
         """Retrieve signal notes from the database"""
-        try:
-            # Fetch the signal notes data from the database
+    try:
+        # Fetch the signal notes data from the database
             notes_data = await self.db.get_signal_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_tags(self, signal_id):
         """Retrieve signal tags from the database"""
-        try:
-            # Fetch the signal tags data from the database
+    try:
+        # Fetch the signal tags data from the database
             tags_data = await self.db.get_signal_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
 
 from telegram.error import TelegramError, BadRequest
@@ -6627,7 +6626,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-        else:
+    else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -6645,7 +6644,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-            else:
+        else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -6686,7 +6685,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-            else:
+        else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -6713,7 +6712,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -6791,7 +6790,7 @@ class TelegramService:
         self.sentiment_cache_ttl = 60 * 60  # 1 hour in seconds
         
         # Start the bot
-        try:
+    try:
             # Check for bot token
             if not self.bot_token:
                 raise ValueError("Missing Telegram bot token")
@@ -6813,13 +6812,13 @@ class TelegramService:
             # Keep track of processed updates
             self.processed_updates = set()
             
-        except Exception as e:
-            logger.error(f"Error initializing Telegram service: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing Telegram service: {str(e)}")
             raise
 
     async def initialize_services(self):
         """Initialize services that require an asyncio event loop"""
-        try:
+    try:
             # Initialize chart service
             await self.chart_service.initialize()
             logger.info("Chart service initialized")
@@ -6837,20 +6836,20 @@ class TelegramService:
                 # Schedule periodic cleanup (every 24 hours)
                 async def periodic_cleanup():
                     while True:
-                        try:
+                    try:
                             # Wait for 24 hours
                             await asyncio.sleep(24 * 60 * 60)
                             # Run cleanup
                             cleaned = await self._cleanup_old_signals(max_age_days=7)
                             logger.info(f"Periodic signal cleanup completed, removed {cleaned} old signals")
-                        except Exception as e:
-                            logger.error(f"Error in periodic signal cleanup: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error in periodic signal cleanup: {str(e)}")
                 
                 # Start the periodic cleanup task
                 asyncio.create_task(periodic_cleanup())
                 logger.info("Scheduled periodic signal cleanup")
-        except Exception as e:
-            logger.error(f"Error initializing services: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error initializing services: {str(e)}")
             raise
             
     # Calendar service helpers
@@ -6875,11 +6874,11 @@ class TelegramService:
             return "<b>📅 Economic Calendar</b>\n\nNo economic events found for today."
         
         # Sort events by time
-        try:
+    try:
             # Try to parse time for sorting
             def parse_time_for_sorting(event):
                 time_str = event.get('time', '')
-                try:
+            try:
                     # Extract hour and minute if in format like "08:30 EST"
                     if ':' in time_str:
                         parts = time_str.split(' ')[0].split(':')
@@ -6892,7 +6891,7 @@ class TelegramService:
             
             # Sort the events by time
             sorted_events = sorted(calendar_data, key=parse_time_for_sorting)
-        except Exception as e:
+    except Exception as e:
             self.logger.error(f"Error sorting calendar events: {str(e)}")
             sorted_events = calendar_data
         
@@ -6934,7 +6933,7 @@ class TelegramService:
     # Utility functions that might be missing
     async def update_message(self, query, text, keyboard=None, parse_mode=ParseMode.HTML):
         """Utility to update a message with error handling"""
-        try:
+    try:
             # Check if the message is too long for Telegram caption limits (1024 chars)
             MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
             MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
@@ -6954,7 +6953,7 @@ class TelegramService:
                 return True
             # If message is too long even for a text message
             elif len(text) > MAX_MESSAGE_LENGTH:
-                logger.warning(f"Message too long ({len(text)} chars), truncating")
+            logger.warning(f"Message too long ({len(text)} chars), truncating")
                 # Find a good breaking point
                 truncated = text[:MAX_MESSAGE_LENGTH-100]
                 
@@ -6973,7 +6972,7 @@ class TelegramService:
                     parse_mode=parse_mode
                 )
                 return True
-            else:
+        else:
                 # Normal case - message is within limits
                 # Try to edit message text first
                 await query.edit_message_text(
@@ -6982,16 +6981,16 @@ class TelegramService:
                     parse_mode=parse_mode
                 )
                 return True
-        except Exception as e:
-            logger.warning(f"Could not update message text: {str(e)}")
+    except Exception as e:
+        logger.warning(f"Could not update message text: {str(e)}")
             
             # If text update fails, try to edit caption
-            try:
+        try:
                 # Check if caption is too long
                 MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
                 
                 if len(text) > MAX_CAPTION_LENGTH:
-                    logger.warning(f"Caption too long ({len(text)} chars), truncating")
+                logger.warning(f"Caption too long ({len(text)} chars), truncating")
                     # Find a good breaking point
                     truncated = text[:MAX_CAPTION_LENGTH-100]
                     
@@ -7009,7 +7008,7 @@ class TelegramService:
                         reply_markup=keyboard,
                         parse_mode=parse_mode
                     )
-                else:
+            else:
                     # Caption is within limits
                     await query.edit_message_caption(
                         caption=text,
@@ -7018,17 +7017,17 @@ class TelegramService:
                     )
                 return True
             except Exception as e2:
-                logger.error(f"Could not update caption either: {str(e2)}")
+            logger.error(f"Could not update caption either: {str(e2)}")
                 
                 # As a last resort, send a new message
-                try:
+            try:
                     chat_id = query.message.chat_id
                     
                     # Check if message is too long
                     MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
                     
                     if len(text) > MAX_MESSAGE_LENGTH:
-                        logger.warning(f"New message too long ({len(text)} chars), truncating")
+                    logger.warning(f"New message too long ({len(text)} chars), truncating")
                         # Find a good breaking point
                         truncated = text[:MAX_MESSAGE_LENGTH-100]
                         
@@ -7047,7 +7046,7 @@ class TelegramService:
                             reply_markup=keyboard,
                             parse_mode=parse_mode
                         )
-                    else:
+                else:
                         # Message is within limits
                         await query.bot.send_message(
                             chat_id=chat_id,
@@ -7057,7 +7056,7 @@ class TelegramService:
                         )
                     return True
                 except Exception as e3:
-                    logger.error(f"Failed to send new message: {str(e3)}")
+                logger.error(f"Failed to send new message: {str(e3)}")
                     return False
     
     # Missing handler implementations
@@ -7121,7 +7120,7 @@ class TelegramService:
         Returns:
             List of subscribed user IDs
         """
-        try:
+    try:
             logger.info(f"Getting subscribers for {instrument} timeframe: {timeframe}")
             
             # Get all subscribers from the database
@@ -7129,7 +7128,7 @@ class TelegramService:
             subscribers = await self.db.get_signal_subscriptions(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return []
                 
             # Filter out subscribers that don't have an active subscription
@@ -7145,13 +7144,13 @@ class TelegramService:
                 
                 if is_subscribed and not payment_failed:
                     active_subscribers.append(user_id)
-                else:
+            else:
                     logger.info(f"User {user_id} doesn't have an active subscription, skipping signal")
             
             return active_subscribers
             
-        except Exception as e:
-            logger.error(f"Error getting subscribers: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting subscribers: {str(e)}")
             # FOR TESTING: Add admin users if available
             if hasattr(self, 'admin_users') and self.admin_users:
                 logger.info(f"Returning admin users for testing: {self.admin_users}")
@@ -7169,7 +7168,7 @@ class TelegramService:
         Returns:
             bool: True if signal was processed successfully, False otherwise
         """
-        try:
+    try:
             # Log the incoming signal data
             logger.info(f"Processing signal: {signal_data}")
             
@@ -7220,13 +7219,13 @@ class TelegramService:
                     'take_profit': take_profit,
                     'timeframe': timeframe
                 }
-            else:
-                logger.error(f"Missing required signal data")
+        else:
+            logger.error(f"Missing required signal data")
                 return False
             
             # Basic validation
             if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
-                logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
+            logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
                 return False
                 
             # Create signal ID for tracking
@@ -7254,7 +7253,7 @@ class TelegramService:
             
             # FOR TESTING: Always send to admin for testing
             if hasattr(self, 'admin_users') and self.admin_users:
-                try:
+            try:
                     logger.info(f"Sending signal to admin users for testing: {self.admin_users}")
                     for admin_id in self.admin_users:
                         # Prepare keyboard with analysis options
@@ -7280,15 +7279,15 @@ class TelegramService:
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
-                except Exception as e:
-                    logger.error(f"Error sending test signal to admin: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending test signal to admin: {str(e)}")
             
             # Get subscribers for this instrument
             timeframe = normalized_data.get('timeframe', '1h')
             subscribers = await self.get_subscribers_for_instrument(instrument, timeframe)
             
             if not subscribers:
-                logger.warning(f"No subscribers found for {instrument}")
+            logger.warning(f"No subscribers found for {instrument}")
                 return True  # Successfully processed, just no subscribers
             
             # Send signal to all subscribers
@@ -7296,7 +7295,7 @@ class TelegramService:
             
             sent_count = 0
             for user_id in subscribers:
-                try:
+            try:
                     # Prepare keyboard with analysis options
                     keyboard = [
                         [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
@@ -7322,20 +7321,20 @@ class TelegramService:
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
                     
-                except Exception as e:
-                    logger.error(f"Error sending signal to user {user_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error sending signal to user {user_id}: {str(e)}")
             
             logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
             return True
             
-        except Exception as e:
-            logger.error(f"Error processing signal: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error processing signal: {str(e)}")
+        logger.exception(e)
             return False
 
     def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
         """Format signal data into a nice message for Telegram"""
-        try:
+    try:
             # Extract fields from signal data
             instrument = signal_data.get('instrument', 'Unknown')
             direction = signal_data.get('direction', 'Unknown')
@@ -7386,25 +7385,25 @@ class TelegramService:
             
             return message
             
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error formatting signal message: {str(e)}")
             # Return simple message on error
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     def _register_handlers(self, application):
         """Register event handlers for bot commands and callback queries"""
-        try:
+    try:
             logger.info("Registering command handlers")
             
             # Initialize the application without using run_until_complete
-            try:
+        try:
                 # Instead of using loop.run_until_complete, directly call initialize 
                 # which will be properly awaited by the caller
                 self.init_task = application.initialize()
                 logger.info("Telegram application initialization ready to be awaited")
             except Exception as init_e:
-                logger.error(f"Error during application initialization: {str(init_e)}")
-                logger.exception(init_e)
+            logger.error(f"Error during application initialization: {str(init_e)}")
+            logger.exception(init_e)
                 
             # Set bot commands for menu
             commands = [
@@ -7414,12 +7413,12 @@ class TelegramService:
             ]
             
             # Store the set_commands_task to be awaited later
-            try:
+        try:
                 # Instead of asyncio.create_task, we will await this in the startup event
                 self.set_commands_task = self.bot.set_my_commands(commands)
                 logger.info("Bot commands ready to be set")
             except Exception as cmd_e:
-                logger.error(f"Error preparing bot commands: {str(cmd_e)}")
+            logger.error(f"Error preparing bot commands: {str(cmd_e)}")
             
             # Register command handlers
             application.add_handler(CommandHandler("start", self.start_command))
@@ -7483,9 +7482,9 @@ class TelegramService:
             
             logger.info("Bot setup completed successfully")
             
-        except Exception as e:
-            logger.error(f"Error setting up bot handlers: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error setting up bot handlers: {str(e)}")
+        logger.exception(e)
 
     @property
     def signals_enabled(self):
@@ -7505,7 +7504,7 @@ class TelegramService:
         first_name = user.first_name
         
         # Try to add the user to the database if they don't exist yet
-        try:
+    try:
             # Get user subscription since we can't check if user exists directly
             existing_subscription = await self.db.get_user_subscription(user_id)
             
@@ -7513,11 +7512,11 @@ class TelegramService:
                 # Add new user
                 logger.info(f"New user started: {user_id}, {first_name}")
                 await self.db.save_user(user_id, first_name, None, user.username)
-            else:
+        else:
                 logger.info(f"Existing user started: {user_id}, {first_name}")
                 
-        except Exception as e:
-            logger.error(f"Error registering user: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}")
         
         # Check if the user has a subscription 
         is_subscribed = await self.db.is_user_subscribed(user_id)
@@ -7555,7 +7554,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.HTML
             )
-        else:
+    else:
             # Show the welcome message with trial option from the screenshot
             welcome_text = """
 🚀 Welcome to Sigmapips AI! 🚀
@@ -7595,7 +7594,7 @@ Start today with a FREE 14-day trial!
             # Gebruik de juiste welkomst-GIF URL
             welcome_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
             
-            try:
+        try:
                 # Send the GIF with caption containing the welcome message
                 await update.message.reply_animation(
                     animation=welcome_gif_url,
@@ -7603,8 +7602,8 @@ Start today with a FREE 14-day trial!
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
-            except Exception as e:
-                logger.error(f"Error sending welcome GIF with caption: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error sending welcome GIF with caption: {str(e)}")
                 # Fallback to text-only message if GIF fails
                 await update.message.reply_text(
                     text=welcome_text,
@@ -7619,7 +7618,7 @@ Start today with a FREE 14-day trial!
             await update.message.reply_text("Usage: /set_subscription [chatid] [status] [days]")
             return
             
-        try:
+    try:
             # Parse arguments
             chat_id = int(context.args[0])
             status = context.args[1].lower()
@@ -7647,7 +7646,7 @@ Start today with a FREE 14-day trial!
                 )
                 await update.message.reply_text(f"✅ Subscription set to ACTIVE for user {chat_id} for {days} days")
                 
-            else:
+        else:
                 # Set inactive subscription by setting end date in the past
                 start_date = now - timedelta(days=30)
                 end_date = now - timedelta(days=1)
@@ -7665,30 +7664,30 @@ Start today with a FREE 14-day trial!
             
         except ValueError:
             await update.message.reply_text("Invalid arguments. Chat ID and days must be numbers.")
-        except Exception as e:
-            logger.error(f"Error setting subscription: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error setting subscription: {str(e)}")
             await update.message.reply_text(f"Error: {str(e)}")
             
     async def set_payment_failed_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
         """Secret command to set a user's subscription to the payment failed state"""
         logger.info(f"set_payment_failed command received: {update.message.text}")
         
-        try:
+    try:
             # Extract chat_id directly from the message text if present
             command_parts = update.message.text.split()
             if len(command_parts) > 1:
-                try:
+            try:
                     chat_id = int(command_parts[1])
                     logger.info(f"Extracted chat ID from message: {chat_id}")
                 except ValueError:
-                    logger.error(f"Invalid chat ID format in message: {command_parts[1]}")
+                logger.error(f"Invalid chat ID format in message: {command_parts[1]}")
                     await update.message.reply_text(f"Invalid chat ID format: {command_parts[1]}")
                     return
             # Fallback to context args if needed
             elif context and context.args and len(context.args) > 0:
                 chat_id = int(context.args[0])
                 logger.info(f"Using chat ID from context args: {chat_id}")
-            else:
+        else:
                 # Default to the user's own ID
                 chat_id = update.effective_user.id
                 logger.info(f"No chat ID provided, using sender's ID: {chat_id}")
@@ -7711,8 +7710,8 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 
                                   parse_mode=ParseMode.HTML
                             )
-                    else:
-                        logger.error(f"Failed to update message: {str(text_error)}")
+                else:
+                    logger.error(f"Failed to update message: {str(text_error)}")
                         # Laatste redmiddel: stuur een nieuw bericht
                         await context.bot.send_animation(
                             chat_id=update.effective_chat.id,
@@ -7743,12 +7742,12 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             # If we should show the GIF
             if not skip_gif:
-                try:
+            try:
                     # For message commands we can use reply_animation
                     if hasattr(update, 'message') and update.message:
                         # Verwijder eventuele vorige berichten met callback query
                         if hasattr(update, 'callback_query') and update.callback_query:
-                            try:
+                        try:
                                 await update.callback_query.message.delete()
                             except Exception:
                                 pass
@@ -7760,10 +7759,10 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-                    else:
+                else:
                         # Voor callback_query, verwijder huidige bericht en stuur nieuw bericht
                         if hasattr(update, 'callback_query') and update.callback_query:
-                            try:
+                        try:
                                 # Verwijder het huidige bericht
                                 await update.callback_query.message.delete()
                                 
@@ -7775,15 +7774,15 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                                     parse_mode=ParseMode.HTML,
                                     reply_markup=reply_markup
                                 )
-                            except Exception as e:
-                                logger.error(f"Failed to handle callback query: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"Failed to handle callback query: {str(e)}")
                                 # Valt terug op tekstwijziging als verwijderen niet lukt
                                 await update.callback_query.edit_message_text(
                                     text=WELCOME_MESSAGE,
                                     parse_mode=ParseMode.HTML,
                                     reply_markup=reply_markup
                                 )
-                        else:
+                    else:
                             # Final fallback - try to send a new message
                             await bot.send_animation(
                                 chat_id=update.effective_chat.id,
@@ -7792,8 +7791,8 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                                 parse_mode=ParseMode.HTML,
                                 reply_markup=reply_markup
                             )
-                except Exception as e:
-                    logger.error(f"Failed to send menu GIF: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to send menu GIF: {str(e)}")
                     # Fallback to text-only approach
                     if hasattr(update, 'message') and update.message:
                         await update.message.reply_text(
@@ -7801,14 +7800,14 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-                    else:
+                else:
                         await bot.send_message(
                             chat_id=update.effective_chat.id,
                             text=WELCOME_MESSAGE,
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-            else:
+        else:
                 # Skip GIF mode - just send text
                 if hasattr(update, 'message') and update.message:
                     await update.message.reply_text(
@@ -7816,14 +7815,14 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         parse_mode=ParseMode.HTML,
                         reply_markup=reply_markup
                     )
-                else:
+            else:
                     await bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=WELCOME_MESSAGE,
                         parse_mode=ParseMode.HTML,
                         reply_markup=reply_markup
                     )
-        else:
+    else:
             # Handle non-subscribed users similar to start command
             await self.start_command(update, context)
             
@@ -7868,7 +7867,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             return await self.show_technical_analysis(update, context, instrument=instrument)
         
         # Show the market selection menu
-        try:
+    try:
             # First try to edit message text
             await query.edit_message_text(
                 text="Select market for technical analysis:",
@@ -7877,21 +7876,21 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         except Exception as text_error:
             # If that fails due to caption, try editing caption
             if "There is no text in the message to edit" in str(text_error):
-                try:
+            try:
                     await query.edit_message_caption(
                         caption="Select market for technical analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-                except Exception as e:
-                    logger.error(f"Failed to update caption in analysis_technical_callback: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to update caption in analysis_technical_callback: {str(e)}")
                     # Try to send a new message as last resort
                     await query.message.reply_text(
                         text="Select market for technical analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-            else:
+        else:
                 # Re-raise for other errors
                 raise
         
@@ -7929,7 +7928,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             return await self.show_sentiment_analysis(update, context, instrument=instrument)
             
         # Show the market selection menu
-        try:
+    try:
             # First try to edit message text
             await query.edit_message_text(
                 text="Select market for sentiment analysis:",
@@ -7938,21 +7937,21 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         except Exception as text_error:
             # If that fails due to caption, try editing caption
             if "There is no text in the message to edit" in str(text_error):
-                try:
+            try:
                     await query.edit_message_caption(
                         caption="Select market for sentiment analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-                except Exception as e:
-                    logger.error(f"Failed to update caption in analysis_sentiment_callback: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to update caption in analysis_sentiment_callback: {str(e)}")
                     # Try to send a new message as last resort
                     await query.message.reply_text(
                         text="Select market for sentiment analysis:",
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-            else:
+        else:
                 # Re-raise for other errors
                 raise
         
@@ -7995,7 +7994,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
 
     async def show_economic_calendar(self, update: Update, context: CallbackContext, currency=None, loading_message=None):
         """Show the economic calendar for a specific currency"""
-        try:
+    try:
             # VERIFICATION MARKER: SIGMAPIPS_CALENDAR_FIX_APPLIED
             self.logger.info("VERIFICATION MARKER: SIGMAPIPS_CALENDAR_FIX_APPLIED")
             
@@ -8015,7 +8014,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             if tavily_api_key:
                 masked_key = f"{tavily_api_key[:4]}..." if len(tavily_api_key) > 7 else "***"
                 self.logger.info(f"Tavily API key is available: {masked_key}")
-            else:
+        else:
                 self.logger.warning("No Tavily API key found, will use mock data")
             
             # Get calendar data for ALL major currencies, regardless of the supplied parameter
@@ -8024,13 +8023,13 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             calendar_data = []
             
             # Get all currencies data
-            try:
+        try:
                 if hasattr(calendar_service, 'get_calendar'):
                     calendar_data = await calendar_service.get_calendar()
-                else:
+            else:
                     self.logger.warning("calendar_service.get_calendar method not available, using mock data")
                     calendar_data = []
-            except Exception as e:
+        except Exception as e:
                 self.logger.warning(f"Error getting calendar data: {str(e)}")
                 calendar_data = []
             
@@ -8043,7 +8042,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 # Use the mock data generator from the calendar service if available
                 if hasattr(calendar_service, '_generate_mock_calendar_data'):
                     mock_data = calendar_service._generate_mock_calendar_data(MAJOR_CURRENCIES, today_date)
-                else:
+            else:
                     # Otherwise use our own implementation
                     mock_data = self._generate_mock_calendar_data(MAJOR_CURRENCIES, today_date)
                 
@@ -8065,11 +8064,11 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             # Format the calendar data in chronological order
             if hasattr(self, '_format_calendar_events'):
                 message = await self._format_calendar_events(calendar_data)
-            else:
+        else:
                 # Fallback to calendar service formatting if the method doesn't exist on TelegramService
                 if hasattr(calendar_service, '_format_calendar_response'):
                     message = await calendar_service._format_calendar_response(calendar_data, "ALL")
-                else:
+            else:
                     # Simple formatting fallback
                     message = "<b>📅 Economic Calendar</b>\n\n"
                     for event in calendar_data[:10]:  # Limit to first 10 events
@@ -8082,19 +8081,19 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             keyboard = None
             if context and hasattr(context, 'user_data') and context.user_data.get('from_signal', False):
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back_to_signal_analysis")]])
-            else:
+        else:
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_analyse")]])
             
             # Try to delete loading message first if it exists
             if loading_message:
-                try:
+            try:
                     await loading_message.delete()
                     self.logger.info("Successfully deleted loading message")
                 except Exception as delete_error:
                     self.logger.warning(f"Could not delete loading message: {str(delete_error)}")
                     
                     # If deletion fails, try to edit it
-                    try:
+                try:
                         await context.bot.edit_message_text(
                             chat_id=chat_id,
                             message_id=loading_message.message_id,
@@ -8116,7 +8115,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             )
             self.logger.info("Sent calendar data as new message")
         
-        except Exception as e:
+    except Exception as e:
             self.logger.error(f"Error showing economic calendar: {str(e)}")
             self.logger.exception(e)
             
@@ -8242,7 +8241,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             loading_message = None
             
-            try:
+        try:
                 # Try to update with animated GIF first (best visual experience)
                 await query.edit_message_media(
                     media=InputMediaAnimation(
@@ -8252,10 +8251,10 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 )
                 logger.info(f"Successfully showed loading GIF for {instrument}")
             except Exception as media_error:
-                logger.warning(f"Could not update with GIF: {str(media_error)}")
+            logger.warning(f"Could not update with GIF: {str(media_error)}")
                 
                 # If GIF fails, try to update the text
-                try:
+            try:
                     loading_message = await query.edit_message_text(
                         text=loading_text
                     )
@@ -8266,18 +8265,18 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
                         context.user_data['loading_message'] = loading_message
                 except Exception as text_error:
-                    logger.warning(f"Could not update text: {str(text_error)}")
+                logger.warning(f"Could not update text: {str(text_error)}")
                     
                     # If text update fails, try to update caption
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption=loading_text
                         )
                     except Exception as caption_error:
-                        logger.warning(f"Could not update caption: {str(caption_error)}")
+                    logger.warning(f"Could not update caption: {str(caption_error)}")
                         
                         # Last resort - send a new message with loading GIF
-                        try:
+                    try:
                             from trading_bot.services.telegram_service.gif_utils import send_loading_gif
                             await send_loading_gif(
                                 self.bot,
@@ -8285,13 +8284,13 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                                 caption=f"⏳ <b>Analyzing technical data for {instrument}...</b>"
                             )
                         except Exception as gif_error:
-                            logger.warning(f"Could not show loading GIF: {str(gif_error)}")
+                        logger.warning(f"Could not show loading GIF: {str(gif_error)}")
             
             # Show technical analysis for this instrument
             return await self.show_technical_analysis(update, context, instrument=instrument)
-        else:
+    else:
             # Error handling - go back to signal analysis menu
-            try:
+        try:
                 # First try to edit message text
                 await query.edit_message_text(
                     text="Could not find the instrument. Please try again.",
@@ -8300,21 +8299,21 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             except Exception as text_error:
                 # If that fails due to caption, try editing caption
                 if "There is no text in the message to edit" in str(text_error):
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-                    except Exception as e:
-                        logger.error(f"Failed to update caption in signal_technical_callback: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to update caption in signal_technical_callback: {str(e)}")
                         # Try to send a new message as last resort
                         await query.message.reply_text(
                             text="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-                else:
+            else:
                     # Re-raise for other errors
                     raise
             return CHOOSE_ANALYSIS
@@ -8370,7 +8369,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             loading_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
             loading_text = f"Loading sentiment analysis for {instrument}..."
             
-            try:
+        try:
                 # Try to update with animated GIF first (best visual experience)
                 await query.edit_message_media(
                     media=InputMediaAnimation(
@@ -8380,10 +8379,10 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 )
                 logger.info(f"Successfully showed loading GIF for {instrument} sentiment analysis")
             except Exception as media_error:
-                logger.warning(f"Could not update with GIF: {str(media_error)}")
+            logger.warning(f"Could not update with GIF: {str(media_error)}")
                 
                 # If GIF fails, try to update the text
-                try:
+            try:
                     loading_message = await query.edit_message_text(
                         text=loading_text
                     )
@@ -8394,18 +8393,18 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
                         context.user_data['loading_message'] = loading_message
                 except Exception as text_error:
-                    logger.warning(f"Could not update text: {str(text_error)}")
+                logger.warning(f"Could not update text: {str(text_error)}")
                     
                     # If text update fails, try to update caption
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption=loading_text
                         )
                     except Exception as caption_error:
-                        logger.warning(f"Could not update caption: {str(caption_error)}")
+                    logger.warning(f"Could not update caption: {str(caption_error)}")
                         
                         # Last resort - send a new message with loading GIF
-                        try:
+                    try:
                             from trading_bot.services.telegram_service.gif_utils import send_loading_gif
                             await send_loading_gif(
                                 self.bot,
@@ -8413,13 +8412,13 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                                 caption=f"⏳ <b>Analyzing market sentiment for {instrument}...</b>"
                             )
                         except Exception as gif_error:
-                            logger.warning(f"Could not show loading GIF: {str(gif_error)}")
+                        logger.warning(f"Could not show loading GIF: {str(gif_error)}")
             
             # Show sentiment analysis for this instrument
             return await self.show_sentiment_analysis(update, context, instrument=instrument)
-        else:
+    else:
             # Error handling - go back to signal analysis menu
-            try:
+        try:
                 # First try to edit message text
                 await query.edit_message_text(
                     text="Could not find the instrument. Please try again.",
@@ -8428,21 +8427,21 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             except Exception as text_error:
                 # If that fails due to caption, try editing caption
                 if "There is no text in the message to edit" in str(text_error):
-                    try:
+                try:
                         await query.edit_message_caption(
                             caption="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-                    except Exception as e:
-                        logger.error(f"Failed to update caption in signal_sentiment_callback: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to update caption in signal_sentiment_callback: {str(e)}")
                         # Try to send a new message as last resort
                         await query.message.reply_text(
                             text="Could not find the instrument. Please try again.",
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-            else:
+        else:
                 # Re-raise for other errors
                 raise
         return CHOOSE_ANALYSIS
@@ -8527,7 +8526,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         loading_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
         loading_text = f"Loading economic calendar..."
         
-        try:
+    try:
             # Try to update with animated GIF first (best visual experience)
             await query.edit_message_media(
                 media=InputMediaAnimation(
@@ -8537,10 +8536,10 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             )
             logger.info(f"Successfully showed loading GIF for economic calendar")
         except Exception as media_error:
-            logger.warning(f"Could not update with GIF: {str(media_error)}")
+        logger.warning(f"Could not update with GIF: {str(media_error)}")
             
             # If GIF fails, try to update the text
-            try:
+        try:
                 loading_message = await query.edit_message_text(
                     text=loading_text
                 )
@@ -8551,18 +8550,18 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
                     context.user_data['loading_message'] = loading_message
             except Exception as text_error:
-                logger.warning(f"Could not update text: {str(text_error)}")
+            logger.warning(f"Could not update text: {str(text_error)}")
                 
                 # If text update fails, try to update caption
-                try:
+            try:
                     await query.edit_message_caption(
                         caption=loading_text
                     )
                 except Exception as caption_error:
-                    logger.warning(f"Could not update caption: {str(caption_error)}")
+                logger.warning(f"Could not update caption: {str(caption_error)}")
                     
                     # Last resort - send a new message with loading GIF
-                    try:
+                try:
                         from trading_bot.services.telegram_service.gif_utils import send_loading_gif
                         await send_loading_gif(
                             self.bot,
@@ -8570,7 +8569,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             caption=f"⏳ <b>Loading economic calendar...</b>"
                         )
                     except Exception as gif_error:
-                        logger.warning(f"Could not show loading GIF: {str(gif_error)}")
+                    logger.warning(f"Could not show loading GIF: {str(gif_error)}")
         
         # Show calendar analysis for ALL major currencies
         return await self.show_calendar_analysis(update, context, instrument=None)
@@ -8580,7 +8579,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         query = update.callback_query
         await query.answer()
         
-        try:
+    try:
             # Get the current signal being viewed
             user_id = update.effective_user.id
             user_str_id = str(user_id)
@@ -8664,8 +8663,8 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     matching_signals.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
                     signal_id, signal_data = matching_signals[0]
                     logger.info(f"Found matching signal with ID: {signal_id}")
-                else:
-                    logger.warning(f"No matching signals found for instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}")
+            else:
+                logger.warning(f"No matching signals found for instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}")
                     # If no exact match, try with just the instrument
                     matching_signals = []
                     for sig_id, sig in user_signal_dict.items():
@@ -8680,7 +8679,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             # If still no signal data, try to get from database
             if not signal_data and signal_instrument and hasattr(self, 'db') and self.db:
                 logger.info(f"Trying to retrieve signals for instrument {signal_instrument} from database")
-                try:
+            try:
                     signals = await self.db.get_user_signals(user_id, signal_instrument)
                     if signals and len(signals) > 0:
                         # Use the most recent signal
@@ -8697,7 +8696,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             
                         self.user_signals[user_str_id][signal_id] = signal_data
                 except Exception as db_error:
-                    logger.error(f"Error retrieving signals from database: {str(db_error)}")
+                logger.error(f"Error retrieving signals from database: {str(db_error)}")
             
             if not signal_data:
                 # Fallback message if signal not found
@@ -8725,12 +8724,12 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             return SIGNAL_DETAILS
             
-        except Exception as e:
-            logger.error(f"Error in back_to_signal_callback: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error in back_to_signal_callback: {str(e)}")
+        logger.exception(e)
             
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -8758,11 +8757,11 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             return SIGNAL_DETAILS
             
-        except Exception as e:
-            logger.error(f"Error in back_to_signal_callback: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in back_to_signal_callback: {str(e)}")
             
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -8779,7 +8778,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         await query.answer()
         logger.info(f"analyze_from_signal_callback called with data: {query.data}")
         
-        try:
+    try:
             # Extract signal information from callback data
             parts = query.data.split('_')
             
@@ -8841,19 +8840,19 @@ Select the type of analysis you want to perform:",
                 )
                 
                 return CHOOSE_ANALYSIS
-            else:
+        else:
                 # Invalid callback data
                 await query.edit_message_text(
                     text="Invalid signal format. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
                 )
                 return MENU
-        except Exception as e:
-            logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
+        logger.exception(e)
             
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -8861,10 +8860,10 @@ Select the type of analysis you want to perform:",
             except Exception:
                 pass
             return MENU
-        except Exception as e:
-            logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
             # Error recovery
-            try:
+        try:
                 await query.edit_message_text(
                     text="An error occurred. Please try again from the main menu.",
                     reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
@@ -8875,8 +8874,8 @@ Select the type of analysis you want to perform:",
 
     async def _store_original_signal_page(self, update: Update, context: ContextTypes.DEFAULT_TYPE, instrument: str, signal_id: str):
         """Store the original signal page data for later retrieval"""
-        try:
-            # Fetch the signal data from the database
+    try:
+        # Fetch the signal data from the database
             signal_data = await self.db.get_user_signals(update.effective_user.id, instrument)
             
             if signal_data:
@@ -8892,69 +8891,69 @@ Select the type of analysis you want to perform:",
                 await self.db.save_signal_page(update.effective_user.id, instrument, signal_page_data)
                 
                 logger.info(f"Original signal page data stored for {instrument} with signal ID {signal_id}")
-            else:
-                logger.warning(f"No signal data found for {instrument} with signal ID {signal_id}")
-        except Exception as e:
-            logger.error(f"Error storing original signal page: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No signal data found for {instrument} with signal ID {signal_id}")
+    except Exception as e:
+        logger.error(f"Error storing original signal page: {str(e)}")
+        logger.exception(e)
 
     async def _get_original_signal_page(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Retrieve the original signal page data for a given signal"""
-        try:
-            # Fetch the signal page data from the database
+    try:
+        # Fetch the signal page data from the database
             signal_page_data = await self.db.get_signal_page(update.effective_user.id, update.callback_query.data.split('_')[3])
             
             if signal_page_data:
                 return signal_page_data
-            else:
-                logger.warning(f"No signal page data found for signal ID {update.callback_query.data.split('_')[3]}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving original signal page: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No signal page data found for signal ID {update.callback_query.data.split('_')[3]}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving original signal page: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _load_signals(self):
         """Load signals from the database"""
-        try:
-            # Fetch all signals from the database
+    try:
+        # Fetch all signals from the database
             signals = await self.db.get_all_signals()
             
             if signals:
                 for signal in signals:
                     self.user_signals[str(signal['user_id'])] = {signal['id']: signal}
                 logger.info(f"Loaded {len(signals)} signals from the database")
-            else:
+        else:
                 logger.info("No signals found in the database")
-        except Exception as e:
-            logger.error(f"Error loading signals: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error loading signals: {str(e)}")
+        logger.exception(e)
 
     async def _cleanup_old_signals(self, max_age_days):
         """Cleanup old signals from the database"""
-        try:
+    try:
             # Calculate the date threshold
             threshold_date = datetime.now() - timedelta(days=max_age_days)
             
-            # Fetch signals older than the threshold date
+        # Fetch signals older than the threshold date
             signals_to_delete = await self.db.get_old_signals(threshold_date)
             
             if signals_to_delete:
                 for signal in signals_to_delete:
                     await self.db.delete_signal(signal['id'])
                 logger.info(f"Deleted {len(signals_to_delete)} old signals from the database")
-            else:
+        else:
                 logger.info("No old signals found to delete")
             
             return len(signals_to_delete)
-        except Exception as e:
-            logger.error(f"Error cleaning up old signals: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error cleaning up old signals: {str(e)}")
+        logger.exception(e)
             return 0
 
     async def _format_signal_message(self, signal_data):
         """Format the signal message for display"""
-        try:
+    try:
             # Extract fields from signal data
             instrument = signal_data.get('instrument', 'Unknown')
             direction = signal_data.get('direction', 'Unknown')
@@ -9004,1752 +9003,1752 @@ Select the type of analysis you want to perform:",
             message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
             
             return message
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
-            logger.exception(e)
+    except Exception as e:
+        logger.error(f"Error formatting signal message: {str(e)}")
+        logger.exception(e)
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     async def _get_signal_details(self, signal_id):
         """Retrieve signal details from the database"""
-        try:
-            # Fetch the signal data from the database
+    try:
+        # Fetch the signal data from the database
             signal_data = await self.db.get_signal(signal_id)
             
             if signal_data:
                 return signal_data
-            else:
-                logger.warning(f"No signal data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal details: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No signal data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal details: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_analysis(self, signal_id):
         """Retrieve signal analysis from the database"""
-        try:
-            # Fetch the signal analysis data from the database
+    try:
+        # Fetch the signal analysis data from the database
             analysis_data = await self.db.get_signal_analysis(signal_id)
             
             if analysis_data:
                 return analysis_data
-            else:
-                logger.warning(f"No analysis data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal analysis: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No analysis data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal analysis: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_sentiment(self, signal_id):
         """Retrieve signal sentiment from the database"""
-        try:
-            # Fetch the signal sentiment data from the database
+    try:
+        # Fetch the signal sentiment data from the database
             sentiment_data = await self.db.get_signal_sentiment(signal_id)
             
             if sentiment_data:
                 return sentiment_data
-            else:
-                logger.warning(f"No sentiment data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal sentiment: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No sentiment data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal sentiment: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_calendar(self, signal_id):
         """Retrieve signal calendar data from the database"""
-        try:
-            # Fetch the signal calendar data from the database
+    try:
+        # Fetch the signal calendar data from the database
             calendar_data = await self.db.get_signal_calendar(signal_id)
             
             if calendar_data:
                 return calendar_data
-            else:
-                logger.warning(f"No calendar data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal calendar: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No calendar data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal calendar: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_market(self, signal_id):
         """Retrieve signal market data from the database"""
-        try:
-            # Fetch the signal market data from the database
+    try:
+        # Fetch the signal market data from the database
             market_data = await self.db.get_signal_market(signal_id)
             
             if market_data:
                 return market_data
-            else:
-                logger.warning(f"No market data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal market: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No market data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal market: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_trades(self, signal_id):
         """Retrieve signal trades from the database"""
-        try:
-            # Fetch the signal trades data from the database
-            trades_data = await self.db.get_signal_trades(signal_id)
+    try:
+        # Fetch the signal trades data from the database
+        trades_data = await self.db.get_signal_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_comments(self, signal_id):
         """Retrieve signal comments from the database"""
-        try:
-            # Fetch the signal comments data from the database
+    try:
+        # Fetch the signal comments data from the database
             comments_data = await self.db.get_signal_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_attachments(self, signal_id):
         """Retrieve signal attachments from the database"""
-        try:
-            # Fetch the signal attachments data from the database
+    try:
+        # Fetch the signal attachments data from the database
             attachments_data = await self.db.get_signal_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_notes(self, signal_id):
         """Retrieve signal notes from the database"""
-        try:
-            # Fetch the signal notes data from the database
+    try:
+        # Fetch the signal notes data from the database
             notes_data = await self.db.get_signal_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_tags(self, signal_id):
         """Retrieve signal tags from the database"""
-        try:
-            # Fetch the signal tags data from the database
+    try:
+        # Fetch the signal tags data from the database
             tags_data = await self.db.get_signal_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving signal tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving signal tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_trades(self, signal_id):
-        """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
-            trades_data = await self.db.get_related_trades(signal_id)
+    """Retrieve related trades from the database"""
+    try:
+        # Fetch the related trades data from the database
+        trades_data = await self.db.get_related_trades(signal_id)
             
-            if trades_data:
-                return trades_data
-            else:
-                logger.warning(f"No related trades data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related trades: {str(e)}")
-            logger.exception(e)
+        if trades_data:
+            return trades_data
+        else:
+            logger.warning(f"No related trades data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related trades: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_comments(self, signal_id):
         """Retrieve related comments from the database"""
-        try:
-            # Fetch the related comments data from the database
+    try:
+        # Fetch the related comments data from the database
             comments_data = await self.db.get_related_comments(signal_id)
             
             if comments_data:
                 return comments_data
-            else:
-                logger.warning(f"No related comments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related comments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related comments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related comments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_attachments(self, signal_id):
         """Retrieve related attachments from the database"""
-        try:
-            # Fetch the related attachments data from the database
+    try:
+        # Fetch the related attachments data from the database
             attachments_data = await self.db.get_related_attachments(signal_id)
             
             if attachments_data:
                 return attachments_data
-            else:
-                logger.warning(f"No related attachments data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related attachments: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related attachments data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related attachments: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_notes(self, signal_id):
         """Retrieve related notes from the database"""
-        try:
-            # Fetch the related notes data from the database
+    try:
+        # Fetch the related notes data from the database
             notes_data = await self.db.get_related_notes(signal_id)
             
             if notes_data:
                 return notes_data
-            else:
-                logger.warning(f"No related notes data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related notes: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related notes data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related notes: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_tags(self, signal_id):
         """Retrieve related tags from the database"""
-        try:
-            # Fetch the related tags data from the database
+    try:
+        # Fetch the related tags data from the database
             tags_data = await self.db.get_related_tags(signal_id)
             
             if tags_data:
                 return tags_data
-            else:
-                logger.warning(f"No related tags data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related tags: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related tags data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related tags: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_signals(self, signal_id):
         """Retrieve related signals from the database"""
-        try:
-            # Fetch the related signals data from the database
+    try:
+        # Fetch the related signals data from the database
             related_signals_data = await self.db.get_related_signals(signal_id)
             
             if related_signals_data:
                 return related_signals_data
-            else:
-                logger.warning(f"No related signals data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related signals: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related signals data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related signals: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_articles(self, signal_id):
         """Retrieve related articles from the database"""
-        try:
-            # Fetch the related articles data from the database
+    try:
+        # Fetch the related articles data from the database
             articles_data = await self.db.get_related_articles(signal_id)
             
             if articles_data:
                 return articles_data
-            else:
-                logger.warning(f"No related articles data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related articles: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related articles data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related articles: {str(e)}")
+        logger.exception(e)
+        return None
 
     async def _get_signal_related_videos(self, signal_id):
         """Retrieve related videos from the database"""
-        try:
-            # Fetch the related videos data from the database
+    try:
+        # Fetch the related videos data from the database
             videos_data = await self.db.get_related_videos(signal_id)
             
             if videos_data:
                 return videos_data
-            else:
-                logger.warning(f"No related videos data found for signal ID {signal_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Error retrieving related videos: {str(e)}")
-            logger.exception(e)
+        else:
+            logger.warning(f"No related videos data found for signal ID {signal_id}")
             return None
+    except Exception as e:
+        logger.error(f"Error retrieving related videos: {str(e)}")
+        logger.exception(e)
+        return None
 
