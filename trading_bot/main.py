@@ -2697,7 +2697,1734 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         context.user_data['signal_id'] = signal_id
                     
                     # Make a backup copy to ensure we can return to signal later
-# Import necessary modules for improved logging
+                    context.user_data['signal_instrument'] = instrument
+                    context.user_data['from_signal'] = True
+                    
+                    # Store the original signal page for later retrieval
+                    await self._store_original_signal_page(update, context, instrument, signal_id)
+                
+                # Show analysis options for this signal
+                keyboard = [
+                    [InlineKeyboardButton("📈 Technical Analysis", callback_data=f"analysis_technical_signal_{instrument}")],
+                    [InlineKeyboardButton("🧠 Market Sentiment", callback_data=f"analysis_sentiment_signal_{instrument}")],
+                    [InlineKeyboardButton("📅 Economic Calendar", callback_data=f"analysis_calendar_signal_{instrument}")],
+                    [InlineKeyboardButton("⬅️ Back to Signal", callback_data="back_to_signal")]
+                ]
+                
+                # Update the message with the analysis options
+                await query.edit_message_text(
+                    text=f"<b>🔍 Analyze {instrument}</b>\n\nSelect the type of analysis you want to perform:",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.HTML
+                )
+                
+                return CHOOSE_ANALYSIS
+            else:
+                # Invalid callback data
+                await query.edit_message_text(
+                    text="Invalid signal format. Please try again from the main menu.",
+                    reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
+                )
+                return MENU
+        except Exception as e:
+            logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
+            # Error recovery
+            try:
+                await query.edit_message_text(
+                    text="An error occurred. Please try again from the main menu.",
+                    reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
+                )
+            except Exception:
+                pass
+            return MENU
+
+    async def _store_original_signal_page(self, update: Update, context: ContextTypes.DEFAULT_TYPE, instrument: str, signal_id: str):
+        """Store the original signal page data for later retrieval"""
+        try:
+            # Fetch the signal data from the database
+            signal_data = await self.db.get_user_signals(update.effective_user.id, instrument)
+            
+            if signal_data:
+                # Prepare the signal page data
+                signal_page_data = {
+                    "instrument": instrument,
+                    "signal_id": signal_id,
+                    "message": signal_data[0].get('message'),
+                    "timestamp": signal_data[0].get('timestamp')
+                }
+                
+                # Save the signal page data to the database
+                await self.db.save_signal_page(update.effective_user.id, instrument, signal_page_data)
+                
+                logger.info(f"Original signal page data stored for {instrument} with signal ID {signal_id}")
+            else:
+                logger.warning(f"No signal data found for {instrument} with signal ID {signal_id}")
+        except Exception as e:
+            logger.error(f"Error storing original signal page: {str(e)}")
+            logger.exception(e)
+
+    async def _get_original_signal_page(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Retrieve the original signal page data for a given signal"""
+        try:
+            # Fetch the signal page data from the database
+            signal_page_data = await self.db.get_signal_page(update.effective_user.id, update.callback_query.data.split('_')[3])
+            
+            if signal_page_data:
+                return signal_page_data
+            else:
+                logger.warning(f"No signal page data found for signal ID {update.callback_query.data.split('_')[3]}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving original signal page: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _load_signals(self):
+        """Load signals from the database"""
+        try:
+            # Fetch all signals from the database
+            signals = await self.db.get_all_signals()
+            
+            if signals:
+                for signal in signals:
+                    self.user_signals[str(signal['user_id'])] = {signal['id']: signal}
+                logger.info(f"Loaded {len(signals)} signals from the database")
+            else:
+                logger.info("No signals found in the database")
+        except Exception as e:
+            logger.error(f"Error loading signals: {str(e)}")
+            logger.exception(e)
+
+    async def _cleanup_old_signals(self, max_age_days):
+        """Cleanup old signals from the database"""
+        try:
+            # Calculate the date threshold
+            threshold_date = datetime.now() - timedelta(days=max_age_days)
+            
+            # Fetch signals older than the threshold date
+            signals_to_delete = await self.db.get_old_signals(threshold_date)
+            
+            if signals_to_delete:
+                for signal in signals_to_delete:
+                    await self.db.delete_signal(signal['id'])
+                logger.info(f"Deleted {len(signals_to_delete)} old signals from the database")
+            else:
+                logger.info("No old signals found to delete")
+            
+            return len(signals_to_delete)
+        except Exception as e:
+            logger.error(f"Error cleaning up old signals: {str(e)}")
+            logger.exception(e)
+            return 0
+
+    async def _format_signal_message(self, signal_data):
+        """Format the signal message for display"""
+        try:
+            # Extract fields from signal data
+            instrument = signal_data.get('instrument', 'Unknown')
+            direction = signal_data.get('direction', 'Unknown')
+            entry = signal_data.get('entry', 'Unknown')
+            stop_loss = signal_data.get('stop_loss')
+            take_profit = signal_data.get('take_profit')
+            timeframe = signal_data.get('timeframe', '1h')
+            
+            # Get multiple take profit levels if available
+            tp1 = signal_data.get('tp1', take_profit)
+            tp2 = signal_data.get('tp2')
+            tp3 = signal_data.get('tp3')
+            
+            # Add emoji based on direction
+            direction_emoji = "🟢" if direction.upper() == "BUY" else "🔴"
+            
+            # Format the message with multiple take profits if available
+            message = f"<b>🎯 New Trading Signal 🎯</b>\n\n"
+            message += f"<b>Instrument:</b> {instrument}\n"
+            message += f"<b>Action:</b> {direction.upper()} {direction_emoji}\n\n"
+            message += f"<b>Entry Price:</b> {entry}\n"
+            
+            if stop_loss:
+                message += f"<b>Stop Loss:</b> {stop_loss} 🔴\n"
+            
+            # Add take profit levels
+            if tp1:
+                message += f"<b>Take Profit 1:</b> {tp1} 🎯\n"
+            if tp2:
+                message += f"<b>Take Profit 2:</b> {tp2} 🎯\n"
+            if tp3:
+                message += f"<b>Take Profit 3:</b> {tp3} 🎯\n"
+            
+            message += f"\n<b>Timeframe:</b> {timeframe}\n"
+            message += f"<b>Strategy:</b> TradingView Signal\n\n"
+            
+            message += "————————————————————\n\n"
+            message += "<b>Risk Management:</b>\n"
+            message += "• Position size: 1-2% max\n"
+            message += "• Use proper stop loss\n"
+            message += "• Follow your trading plan\n\n"
+            
+            message += "————————————————————\n\n"
+            
+            # Generate AI verdict
+            ai_verdict = f"The {instrument} {direction.lower()} signal shows a promising setup with defined entry at {entry} and stop loss at {stop_loss}. Multiple take profit levels provide opportunities for partial profit taking."
+            message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
+            
+            return message
+        except Exception as e:
+            logger.error(f"Error formatting signal message: {str(e)}")
+            logger.exception(e)
+            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
+
+    async def _get_signal_details(self, signal_id):
+        """Retrieve signal details from the database"""
+        try:
+            # Fetch the signal data from the database
+            signal_data = await self.db.get_signal(signal_id)
+            
+            if signal_data:
+                return signal_data
+            else:
+                logger.warning(f"No signal data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal details: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_analysis(self, signal_id):
+        """Retrieve signal analysis from the database"""
+        try:
+            # Fetch the signal analysis data from the database
+            analysis_data = await self.db.get_signal_analysis(signal_id)
+            
+            if analysis_data:
+                return analysis_data
+            else:
+                logger.warning(f"No analysis data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal analysis: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_sentiment(self, signal_id):
+        """Retrieve signal sentiment from the database"""
+        try:
+            # Fetch the signal sentiment data from the database
+            sentiment_data = await self.db.get_signal_sentiment(signal_id)
+            
+            if sentiment_data:
+                return sentiment_data
+            else:
+                logger.warning(f"No sentiment data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal sentiment: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_calendar(self, signal_id):
+        """Retrieve signal calendar data from the database"""
+        try:
+            # Fetch the signal calendar data from the database
+            calendar_data = await self.db.get_signal_calendar(signal_id)
+            
+            if calendar_data:
+                return calendar_data
+            else:
+                logger.warning(f"No calendar data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal calendar: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_market(self, signal_id):
+        """Retrieve signal market data from the database"""
+        try:
+            # Fetch the signal market data from the database
+            market_data = await self.db.get_signal_market(signal_id)
+            
+            if market_data:
+                return market_data
+            else:
+                logger.warning(f"No market data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal market: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_trades(self, signal_id):
+        """Retrieve signal trades from the database"""
+        try:
+            # Fetch the signal trades data from the database
+            trades_data = await self.db.get_signal_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_comments(self, signal_id):
+        """Retrieve signal comments from the database"""
+        try:
+            # Fetch the signal comments data from the database
+            comments_data = await self.db.get_signal_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_attachments(self, signal_id):
+        """Retrieve signal attachments from the database"""
+        try:
+            # Fetch the signal attachments data from the database
+            attachments_data = await self.db.get_signal_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_notes(self, signal_id):
+        """Retrieve signal notes from the database"""
+        try:
+            # Fetch the signal notes data from the database
+            notes_data = await self.db.get_signal_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_tags(self, signal_id):
+        """Retrieve signal tags from the database"""
+        try:
+            # Fetch the signal tags data from the database
+            tags_data = await self.db.get_signal_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_tags(self, signal_id):
+        """Retrieve related tags from the database"""
+        try:
+            # Fetch the related tags data from the database
+            tags_data = await self.db.get_related_tags(signal_id)
+            
+            if tags_data:
+                return tags_data
+            else:
+                logger.warning(f"No related tags data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related tags: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_signals(self, signal_id):
+        """Retrieve related signals from the database"""
+        try:
+            # Fetch the related signals data from the database
+            related_signals_data = await self.db.get_related_signals(signal_id)
+            
+            if related_signals_data:
+                return related_signals_data
+            else:
+                logger.warning(f"No related signals data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related signals: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_articles(self, signal_id):
+        """Retrieve related articles from the database"""
+        try:
+            # Fetch the related articles data from the database
+            articles_data = await self.db.get_related_articles(signal_id)
+            
+            if articles_data:
+                return articles_data
+            else:
+                logger.warning(f"No related articles data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related articles: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_videos(self, signal_id):
+        """Retrieve related videos from the database"""
+        try:
+            # Fetch the related videos data from the database
+            videos_data = await self.db.get_related_videos(signal_id)
+            
+            if videos_data:
+                return videos_data
+            else:
+                logger.warning(f"No related videos data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related videos: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_trades(self, signal_id):
+        """Retrieve related trades from the database"""
+        try:
+            # Fetch the related trades data from the database
+            trades_data = await self.db.get_related_trades(signal_id)
+            
+            if trades_data:
+                return trades_data
+            else:
+                logger.warning(f"No related trades data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related trades: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_comments(self, signal_id):
+        """Retrieve related comments from the database"""
+        try:
+            # Fetch the related comments data from the database
+            comments_data = await self.db.get_related_comments(signal_id)
+            
+            if comments_data:
+                return comments_data
+            else:
+                logger.warning(f"No related comments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related comments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_attachments(self, signal_id):
+        """Retrieve related attachments from the database"""
+        try:
+            # Fetch the related attachments data from the database
+            attachments_data = await self.db.get_related_attachments(signal_id)
+            
+            if attachments_data:
+                return attachments_data
+            else:
+                logger.warning(f"No related attachments data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related attachments: {str(e)}")
+            logger.exception(e)
+            return None
+
+    async def _get_signal_related_notes(self, signal_id):
+        """Retrieve related notes from the database"""
+        try:
+            # Fetch the related notes data from the database
+            notes_data = await self.db.get_related_notes(signal_id)
+            
+            if notes_data:
+                return notes_data
+            else:
+                logger.warning(f"No related notes data found for signal ID {signal_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving related notes: {str(e)}")
+            logger.exception(e)
+            return None
 import os
 import sys
 import json
