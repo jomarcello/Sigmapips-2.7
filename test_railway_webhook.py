@@ -40,9 +40,12 @@ def test_railway_webhook(webhook_url):
         if not webhook_url.startswith("http"):
             webhook_url = f"https://{webhook_url}"
         
-        # Add /webhook path if not present
-        if not webhook_url.endswith("/webhook"):
-            webhook_url = f"{webhook_url}/webhook"
+        # Add /webhook/signal path if not present
+        if not webhook_url.endswith("/webhook/signal"):
+            if webhook_url.endswith("/webhook"):
+                webhook_url = webhook_url.replace("/webhook", "/webhook/signal")
+            else:
+                webhook_url = f"{webhook_url}/webhook/signal"
         
         logger.info(f"Final webhook URL: {webhook_url}")
         

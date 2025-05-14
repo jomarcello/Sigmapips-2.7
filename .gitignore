@@ -81,3 +81,51 @@ build/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+venv311/
+env/
+ENV/
+
+# Test signals
+test_signals/
+data/
+
+# Backup files
+*.bak
+*.backup
+*.broken
+*.bak2
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+
+# Local development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Test files
+test_*.py
+fix_*.py
+check_*.py
+clean_*.py
+*patch.diff
