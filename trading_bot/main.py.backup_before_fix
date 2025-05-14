@@ -2019,10 +2019,10 @@ class TelegramService:
             logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
             return True
             
-        except Exception as e:
-            logger.error(f"Error processing signal: {str(e)}")
-            logger.exception(e)
-            return False
+    except Exception as e:
+        logger.error(f"Error processing signal: {str(e)}")
+        logger.exception(e)
+        return False
 
     def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
         """Format signal data into a nice message for Telegram"""
@@ -2088,14 +2088,14 @@ class TelegramService:
             logger.info("Registering command handlers")
             
             # Initialize the application without using run_until_complete
-            try:
+        try:
                 # Instead of using loop.run_until_complete, directly call initialize 
                 # which will be properly awaited by the caller
                 self.init_task = application.initialize()
                 logger.info("Telegram application initialization ready to be awaited")
             except Exception as init_e:
-                logger.error(f"Error during application initialization: {str(init_e)}")
-                logger.exception(init_e)
+            logger.error(f"Error during application initialization: {str(init_e)}")
+            logger.exception(init_e)
                 
             # Set bot commands for menu
             commands = [
@@ -2105,12 +2105,12 @@ class TelegramService:
             ]
             
             # Store the set_commands_task to be awaited later
-            try:
+        try:
                 # Instead of asyncio.create_task, we will await this in the startup event
                 self.set_commands_task = self.bot.set_my_commands(commands)
                 logger.info("Bot commands ready to be set")
             except Exception as cmd_e:
-                logger.error(f"Error preparing bot commands: {str(cmd_e)}")
+            logger.error(f"Error preparing bot commands: {str(cmd_e)}")
             
             # Register command handlers
             application.add_handler(CommandHandler("start", self.start_command))
@@ -2191,8 +2191,7 @@ class TelegramService:
 
     async def _get_signal_related_trades(self, signal_id):
         """Retrieve related trades from the database"""
-        try:
-            # Fetch the related trades data from the database
+        # Fetch the related trades data from the database
         trades_data = await self.db.get_related_trades(signal_id)
             
         if trades_data:

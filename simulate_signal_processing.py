@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-Simulate signal processing without Telegram bot dependencies
+Simulate signal processing without requiring the Telegram bot token
 """
 
 import json
 import logging
-from datetime import datetime
-import os
 import argparse
+from datetime import datetime
 
 # Set up logging
 logging.basicConfig(
@@ -17,162 +16,58 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def format_signal_message(signal_data):
-    """Format signal data into a nice message (simulating the Telegram formatting)"""
+    """Format a trading signal for display in Telegram"""
     try:
-        # Extract fields from signal data
-        instrument = signal_data.get('instrument', 'Unknown')
-        direction = signal_data.get('direction', 'Unknown')
-        entry = signal_data.get('entry', 'Unknown')
-        stop_loss = signal_data.get('stop_loss')
-        take_profit = signal_data.get('take_profit')
-        timeframe = signal_data.get('timeframe', '1h')
+        # Extract signal data with defaults
+        instrument = signal_data.get("instrument", "Unknown")
+        direction = signal_data.get("direction", "Unknown").upper()
+        entry_price = signal_data.get("entry") or signal_data.get("price", "Unknown")
+        stop_loss = signal_data.get("stop_loss") or signal_data.get("sl", "Unknown")
+        take_profit = signal_data.get("take_profit") or signal_data.get("tp1", "Unknown")
+        timeframe = signal_data.get("timeframe", "Unknown")
         
-        # Get multiple take profit levels if available
-        tp1 = signal_data.get('tp1', take_profit)
-        tp2 = signal_data.get('tp2')
-        tp3 = signal_data.get('tp3')
+        # Get multiple take profit levels
+        tp1 = signal_data.get("tp1", take_profit)
+        tp2 = signal_data.get("tp2")
+        tp3 = signal_data.get("tp3")
         
         # Add emoji based on direction
         direction_emoji = "🟢" if direction.upper() == "BUY" else "🔴"
         
         # Format the message with multiple take profits if available
-        message = f"🎯 New Trading Signal 🎯\n\n"
-        message += f"Instrument: {instrument}\n"
-        message += f"Action: {direction.upper()} {direction_emoji}\n\n"
-        message += f"Entry Price: {entry}\n"
+        message = f"<b>🎯 New Trading Signal 🎯</b>\n\n"
+        message += f"<b>Instrument:</b> {instrument}\n"
+        message += f"<b>Action:</b> {direction.upper()} {direction_emoji}\n\n"
+        message += f"<b>Entry Price:</b> {entry_price}\n"
         
         if stop_loss:
-            message += f"Stop Loss: {stop_loss} 🔴\n"
+            message += f"<b>Stop Loss:</b> {stop_loss} 🔴\n"
         
         # Add take profit levels
         if tp1:
-            message += f"Take Profit 1: {tp1} 🎯\n"
+            message += f"<b>Take Profit 1:</b> {tp1} 🎯\n"
         if tp2:
-            message += f"Take Profit 2: {tp2} 🎯\n"
+            message += f"<b>Take Profit 2:</b> {tp2} 🎯\n"
         if tp3:
-            message += f"Take Profit 3: {tp3} 🎯\n"
+            message += f"<b>Take Profit 3:</b> {tp3} 🎯\n"
         
-        message += f"\nTimeframe: {timeframe}\n"
-        message += f"Strategy: TradingView Signal\n\n"
+        message += f"\n<b>Timeframe:</b> {timeframe}\n"
+        message += f"<b>Strategy:</b> TradingView Signal\n\n"
         
         message += "————————————————————\n\n"
-        message += "Risk Management:\n"
+        message += "<b>Risk Management:</b>\n"
         message += "• Position size: 1-2% max\n"
         message += "• Use proper stop loss\n"
-        message += "• Follow your trading plan\n\n"
-        
-        message += "————————————————————\n\n"
-        
-        # Generate AI verdict
-        ai_verdict = f"The {instrument} {direction.lower()} signal shows a promising setup with defined entry at {entry} and stop loss at {stop_loss}. Multiple take profit levels provide opportunities for partial profit taking."
-        message += f"🤖 SigmaPips AI Verdict:\n{ai_verdict}"
         
         return message
-        
     except Exception as e:
-        logger.error(f"Error formatting signal message: {str(e)}")
-        # Return simple message on error
-        return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
+        logger.error(f"Error formatting signal: {str(e)}")
+        raise
 
-def process_signal(signal_data):
-    """Process a trading signal (simulation)"""
-    try:
-        # Log the incoming signal data
-        logger.info(f"Processing signal: {signal_data}")
-        
-        # Check which format we're dealing with and normalize it
-        instrument = signal_data.get('instrument')
-        
-        # Handle TradingView format (price, sl, interval)
-        if 'price' in signal_data and 'sl' in signal_data:
-            price = signal_data.get('price')
-            sl = signal_data.get('sl')
-            tp1 = signal_data.get('tp1')
-            tp2 = signal_data.get('tp2')
-            tp3 = signal_data.get('tp3')
-            interval = signal_data.get('interval', '1h')
-            
-            # Determine signal direction based on price and SL relationship
-            direction = "BUY" if float(sl) < float(price) else "SELL"
-            
-            # Create normalized signal data
-            normalized_data = {
-                'instrument': instrument,
-                'direction': direction,
-                'entry': price,
-                'stop_loss': sl,
-                'take_profit': tp1,  # Use first take profit level
-                'timeframe': interval
-            }
-            
-            # Add optional fields if present
-            normalized_data['tp1'] = tp1
-            normalized_data['tp2'] = tp2
-            normalized_data['tp3'] = tp3
-        
-        # Handle custom format (direction, entry, stop_loss, timeframe)
-        elif 'direction' in signal_data and 'entry' in signal_data:
-            direction = signal_data.get('direction')
-            entry = signal_data.get('entry')
-            stop_loss = signal_data.get('stop_loss')
-            take_profit = signal_data.get('take_profit')
-            timeframe = signal_data.get('timeframe', '1h')
-            
-            # Create normalized signal data
-            normalized_data = {
-                'instrument': instrument,
-                'direction': direction,
-                'entry': entry,
-                'stop_loss': stop_loss,
-                'take_profit': take_profit,
-                'timeframe': timeframe
-            }
-            
-            # Add optional fields if present
-            tp1 = signal_data.get('tp1', take_profit)
-            tp2 = signal_data.get('tp2')
-            tp3 = signal_data.get('tp3')
-            if tp1:
-                normalized_data['tp1'] = tp1
-            if tp2:
-                normalized_data['tp2'] = tp2
-            if tp3:
-                normalized_data['tp3'] = tp3
-        else:
-            logger.error(f"Missing required signal data")
-            return False
-        
-        # Basic validation
-        if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
-            logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
-            return False
-                
-        # Create signal ID for tracking
-        signal_id = f"{normalized_data['instrument']}_{normalized_data['direction']}_{normalized_data['timeframe']}_{int(datetime.now().timestamp())}"
-        
-        # Format the signal message
-        message = format_signal_message(normalized_data)
-        
-        # Save the formatted message
-        os.makedirs("test_signals", exist_ok=True)
-        filename = f"test_signals/formatted_signal_{instrument}_{direction}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        
-        with open(filename, "w") as f:
-            f.write(message)
-        
-        logger.info(f"Saved formatted signal message to {filename}")
-        logger.info(f"Formatted message:\n{message}")
-        
-        return True
-            
-    except Exception as e:
-        logger.error(f"Error processing signal: {str(e)}")
-        return False
-
-def create_test_signal(instrument, direction, entry, stop_loss, take_profit, timeframe="15"):
-    """Create a test signal"""
+def simulate_signal_processing(instrument, direction, entry, stop_loss, take_profit, timeframe="15"):
+    """Simulate processing a trading signal"""
     
-    # Create the signal payload in the exact format expected by TradingView webhooks
+    # Create signal data
     signal_data = {
         "instrument": instrument,
         "direction": direction.upper(),
@@ -194,61 +89,56 @@ def create_test_signal(instrument, direction, entry, stop_loss, take_profit, tim
         # Set TP1 directly from input
         signal_data["tp1"] = take_profit
         
-        # For USDJPY SELL with specific values from screenshot
-        if instrument == "USDJPY" and direction.upper() == "SELL" and entry == "141.994":
-            # Use the exact values from the screenshot
-            signal_data["tp1"] = "141.64"  # First TP should be below entry for SELL
-            signal_data["tp2"] = "141.286"  # Second TP even lower
-            signal_data["tp3"] = "140.932"  # Third TP even lower
+        # Calculate TP2 and TP3 based on direction
+        if direction.upper() == "BUY":
+            # For BUY signals, TPs should be above entry in ascending order
+            tp_diff = abs(tp_value - entry_value)
+            signal_data["tp2"] = str(round(entry_value + 1.5 * tp_diff, 5))
+            signal_data["tp3"] = str(round(entry_value + 2.0 * tp_diff, 5))
         else:
-            # Calculate TP2 and TP3 based on direction
-            if direction.upper() == "BUY":
-                # For BUY signals, TPs should be above entry in ascending order
-                tp_diff = abs(tp_value - entry_value)
-                signal_data["tp2"] = str(round(entry_value + 1.5 * tp_diff, 3))
-                signal_data["tp3"] = str(round(entry_value + 2.0 * tp_diff, 3))
-            else:
-                # For SELL signals, TPs should be below entry in descending order
-                # Make sure TP1 is below entry for SELL signals
-                if tp_value > entry_value:
-                    # If TP1 was incorrectly provided above entry, adjust it to be below entry
-                    tp_diff = abs(float(stop_loss) - entry_value)
-                    tp_value = entry_value - tp_diff
-                    signal_data["tp1"] = str(round(tp_value, 3))
-                else:
-                    tp_diff = abs(entry_value - tp_value)
-                
-                # TP2 and TP3 progressively lower
-                signal_data["tp2"] = str(round(entry_value - 1.5 * tp_diff, 3))
-                signal_data["tp3"] = str(round(entry_value - 2.0 * tp_diff, 3))
+            # For SELL signals, TPs should be below entry in descending order
+            tp_diff = abs(entry_value - tp_value)
+            signal_data["tp2"] = str(round(entry_value - 1.5 * tp_diff, 5))
+            signal_data["tp3"] = str(round(entry_value - 2.0 * tp_diff, 5))
     
-    # Save the signal data to a file
-    os.makedirs("test_signals", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"test_signals/signal_{instrument}_{direction}_{timestamp}.json"
+    # Log the signal data
+    logger.info(f"Signal data: {json.dumps(signal_data, indent=2)}")
     
-    with open(filename, "w") as f:
-        json.dump(signal_data, f, indent=2)
+    # Format the signal message
+    formatted_message = format_signal_message(signal_data)
     
-    logger.info(f"Saved test signal to {filename}")
-    logger.info(json.dumps(signal_data, indent=2))
+    # Display the formatted message
+    print("\n" + "=" * 50)
+    print("FORMATTED SIGNAL MESSAGE:")
+    print("=" * 50)
+    print(formatted_message)
+    print("=" * 50 + "\n")
     
-    return signal_data
+    # Create the callback data for the "Analyze Market" button
+    analyze_callback_data = f"analyze_from_signal_{instrument}_{instrument}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    logger.info(f"Analyze Market button callback data: {analyze_callback_data}")
+    
+    return {
+        "status": "success",
+        "signal_data": signal_data,
+        "formatted_message": formatted_message,
+        "analyze_callback_data": analyze_callback_data
+    }
 
 def main():
     """Main entry point for the script"""
     parser = argparse.ArgumentParser(description="Simulate signal processing")
-    parser.add_argument("--instrument", default="USDJPY", help="Trading instrument")
-    parser.add_argument("--direction", default="SELL", choices=["BUY", "SELL"], help="Trade direction")
-    parser.add_argument("--entry", default="141.994", help="Entry price")
-    parser.add_argument("--stop-loss", default="142.054", help="Stop loss price")
-    parser.add_argument("--take-profit", default="141.64", help="Take profit price")
+    parser.add_argument("--instrument", default="EURUSD", help="Trading instrument")
+    parser.add_argument("--direction", default="BUY", choices=["BUY", "SELL"], help="Trade direction")
+    parser.add_argument("--entry", default="1.0850", help="Entry price")
+    parser.add_argument("--stop-loss", default="1.0800", help="Stop loss price")
+    parser.add_argument("--take-profit", default="1.0900", help="Take profit price")
     parser.add_argument("--timeframe", default="15", help="Timeframe in minutes")
     
     args = parser.parse_args()
     
-    # Create test signal
-    signal_data = create_test_signal(
+    # Run the simulation
+    result = simulate_signal_processing(
         args.instrument,
         args.direction,
         args.entry,
@@ -257,10 +147,7 @@ def main():
         args.timeframe
     )
     
-    # Process the signal
-    success = process_signal(signal_data)
-    
-    if success:
+    if result["status"] == "success":
         logger.info("✅ Signal processing simulation successful!")
     else:
         logger.error("❌ Signal processing simulation failed")

@@ -73,5 +73,37 @@ from telegram.error import TelegramError, BadRequest"""
     print(f"Successfully fixed indentation error in {main_file_path}")
     return True
 
+def fix_require_subscription_function():
+    """Fix the indentation in the require_subscription decorator function"""
+    with open('trading_bot/main.py', 'r') as file:
+        content = file.read()
+    
+    # Fix the first else statement (line ~523)
+    content = content.replace("""            return await func(self, update, context, *args, **kwargs)
+    else:""", """            return await func(self, update, context, *args, **kwargs)
+        else:""")
+    
+    # Fix the second else statement (line ~553)
+    content = content.replace("""                ]
+        else:""", """                ]
+            else:""")
+    
+    # Fix the third else statement (line ~580)
+    content = content.replace("""                )
+        else:""", """                )
+            else:""")
+    
+    # Fix the OpenAI API key validation indentation (line ~587)
+    content = content.replace("""    if not validate_openai_key(OPENAI_API_KEY):
+    logger.warning""", """    if not validate_openai_key(OPENAI_API_KEY):
+        logger.warning""")
+    
+    # Write the fixed content back to the file
+    with open('trading_bot/main.py', 'w') as file:
+        file.write(content)
+    
+    print("Fixed indentation issues in trading_bot/main.py")
+
 if __name__ == "__main__":
-    fix_main_py() 
+    fix_main_py()
+    fix_require_subscription_function() 

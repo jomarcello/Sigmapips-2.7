@@ -1730,3 +1730,90 @@ class Database:
         except Exception as e:
             logger.error(f"Error in get_active_signals: {str(e)}")
             return []
+
+    async def save_signal_page(self, user_id: int, instrument: str, signal_page_data: dict) -> bool:
+        """
+        Store signal page data for later retrieval when returning from analysis
+        
+        Arguments:
+            user_id: Telegram user ID
+            instrument: Trading instrument
+            signal_page_data: Signal page data dictionary
+            
+        Returns:
+            bool: Success indicator
+        """
+        try:
+            # Ensure required fields are present
+            if not all(k in signal_page_data for k in ['instrument', 'signal_id', 'message']):
+                logger.warning(f"Missing required fields in signal page data: {signal_page_data}")
+                return False
+                
+            # Generate a key for the signal page
+            page_key = f"signal_page:{user_id}:{instrument}"
+            
+            # Store signal page data in Redis if available
+            if self.using_redis:
+                try:
+                    self.redis.setex(page_key, 24 * 60 * 60, json.dumps(signal_page_data))  # 24 hour expiry
+                    logger.info(f"Signal page data stored in Redis: {page_key}")
+                    return True
+                except Exception as e:
+                    logger.error(f"Error storing signal page in Redis: {str(e)}")
+                    # Fall back to memory cache
+            
+            # Store in memory cache
+            if not hasattr(self, 'signal_page_cache'):
+                self.signal_page_cache = {}
+                
+            user_str_id = str(user_id)
+            if user_str_id not in self.signal_page_cache:
+                self.signal_page_cache[user_str_id] = {}
+                
+            self.signal_page_cache[user_str_id][instrument] = signal_page_data
+            logger.info(f"Signal page data stored in memory cache: {page_key}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving signal page: {str(e)}")
+            return False
+            
+    async def get_signal_page(self, user_id: int, instrument: str) -> dict:
+        """
+        Retrieve signal page data
+        
+        Arguments:
+            user_id: Telegram user ID
+            instrument: Trading instrument
+            
+        Returns:
+            dict: Signal page data or None if not found
+        """
+        try:
+            # Generate a key for the signal page
+            page_key = f"signal_page:{user_id}:{instrument}"
+            
+            # Check Redis first if available
+            if self.using_redis:
+                try:
+                    signal_page_json = self.redis.get(page_key)
+                    if signal_page_json:
+                        logger.info(f"Retrieved signal page from Redis: {page_key}")
+                        return json.loads(signal_page_json)
+                except Exception as e:
+                    logger.error(f"Error retrieving signal page from Redis: {str(e)}")
+                    # Fall back to memory cache
+            
+            # Check memory cache
+            if hasattr(self, 'signal_page_cache'):
+                user_str_id = str(user_id)
+                if user_str_id in self.signal_page_cache and instrument in self.signal_page_cache[user_str_id]:
+                    logger.info(f"Retrieved signal page from memory cache: {page_key}")
+                    return self.signal_page_cache[user_str_id][instrument]
+            
+            logger.warning(f"Signal page not found: {page_key}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error retrieving signal page: {str(e)}")
+            return None

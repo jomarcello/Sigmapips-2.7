@@ -1,0 +1,12 @@
+{
+  "instrument": "GBPUSD",
+  "direction": "BUY",
+  "entry_price": 1.2650,
+  "stop_loss": 1.2600,
+  "take_profit": [1.2700, 1.2750, 1.2800],
+  "timeframe": "1H",
+  "strategy": "Breakout Strategy",
+  "risk_reward": 2.5,
+  "risk_percentage": 1.5,
+  "ai_verdict": "Strong bullish momentum with support at 1.2600. Multiple resistance levels provide good take profit opportunities. Volume confirms trend strength."
+} 
