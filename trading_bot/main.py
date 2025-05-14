@@ -520,7 +520,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-    else:
+        else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -538,7 +538,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-        else:
+            else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -579,7 +579,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-        else:
+            else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -606,7 +606,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -708,11 +708,11 @@ class TelegramService:
             
     except Exception as e:
         logger.error(f"Error initializing Telegram service: {str(e)}")
-            raise
+        raise
 
     async def initialize_services(self):
         """Initialize services that require an asyncio event loop"""
-    try:
+        try:
             # Initialize chart service
             await self.chart_service.initialize()
             logger.info("Chart service initialized")
@@ -730,656 +730,23 @@ class TelegramService:
                 # Schedule periodic cleanup (every 24 hours)
                 async def periodic_cleanup():
                     while True:
-                    try:
+                        try:
                             # Wait for 24 hours
                             await asyncio.sleep(24 * 60 * 60)
                             # Run cleanup
                             cleaned = await self._cleanup_old_signals(max_age_days=7)
                             logger.info(f"Periodic signal cleanup completed, removed {cleaned} old signals")
-                    except Exception as e:
-                        logger.error(f"Error in periodic signal cleanup: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"Error in periodic signal cleanup: {str(e)}")
                 
                 # Start the periodic cleanup task
                 asyncio.create_task(periodic_cleanup())
                 logger.info("Scheduled periodic signal cleanup")
-    except Exception as e:
-        logger.error(f"Error initializing services: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error initializing services: {str(e)}")
             raise
-            
-    # Calendar service helpers
-    @property
-    def calendar_service(self):
-        """Lazy loaded calendar service"""
-        if self._calendar_service is None:
-            # Only initialize the calendar service when it's first accessed
-            self.logger.info("Lazy loading calendar service")
-            self._calendar_service = EconomicCalendarService()
-        return self._calendar_service
-        
-    def _get_calendar_service(self):
-        """Get the calendar service instance"""
-        self.logger.info("Getting calendar service")
-        return self.calendar_service
 
-    async def _format_calendar_events(self, calendar_data):
-        """Format the calendar data into a readable HTML message"""
-        self.logger.info(f"Formatting calendar data with {len(calendar_data)} events")
-        if not calendar_data:
-            return "<b>📅 Economic Calendar</b>\n\nNo economic events found for today."
-        
-        # Sort events by time
-    try:
-            # Try to parse time for sorting
-            def parse_time_for_sorting(event):
-                time_str = event.get('time', '')
-            try:
-                    # Extract hour and minute if in format like "08:30 EST"
-                    if ':' in time_str:
-                        parts = time_str.split(' ')[0].split(':')
-                        hour = int(parts[0])
-                        minute = int(parts[1])
-                        return hour * 60 + minute
-                    return 0
-                except:
-                    return 0
-            
-            # Sort the events by time
-            sorted_events = sorted(calendar_data, key=parse_time_for_sorting)
-    except Exception as e:
-            self.logger.error(f"Error sorting calendar events: {str(e)}")
-            sorted_events = calendar_data
-        
-        # Format the message
-        message = "<b>📅 Economic Calendar</b>\n\n"
-        
-        # Get current date
-        current_date = datetime.now().strftime("%B %d, %Y")
-        message += f"<b>Date:</b> {current_date}\n\n"
-        
-        # Add impact legend
-        message += "<b>Impact:</b> 🔴 High   🟠 Medium   🟢 Low\n\n"
-        
-        # Group events by country
-        events_by_country = {}
-        for event in sorted_events:
-            country = event.get('country', 'Unknown')
-            if country not in events_by_country:
-                events_by_country[country] = []
-            events_by_country[country].append(event)
-        
-        # Format events by country
-        for country, events in events_by_country.items():
-            country_flag = CURRENCY_FLAG.get(country, '')
-            message += f"<b>{country_flag} {country}</b>\n"
-            
-            for event in events:
-                time = event.get('time', 'TBA')
-                title = event.get('title', 'Unknown Event')
-                impact = event.get('impact', 'Low')
-                impact_emoji = {'High': '🔴', 'Medium': '🟠', 'Low': '🟢'}.get(impact, '🟢')
-                
-                message += f"{time} - {impact_emoji} {title}\n"
-            
-            message += "\n"  # Add extra newline between countries
-        
-        return message
-        
-    # Utility functions that might be missing
-    async def update_message(self, query, text, keyboard=None, parse_mode=ParseMode.HTML):
-        """Utility to update a message with error handling"""
-    try:
-            # Check if the message is too long for Telegram caption limits (1024 chars)
-            MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
-            MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
-            
-            # Log message length for debugging
-            logger.info(f"Updating message (length: {len(text)} chars)")
-            
-            # If message is too long for a caption but ok for a text message
-            if len(text) > MAX_CAPTION_LENGTH and len(text) <= MAX_MESSAGE_LENGTH:
-                logger.info("Message too long for caption but ok for text message")
-                # Try to edit message text first
-                await query.edit_message_text(
-                    text=text,
-                    reply_markup=keyboard,
-                    parse_mode=parse_mode
-                )
-                return True
-            # If message is too long even for a text message
-            elif len(text) > MAX_MESSAGE_LENGTH:
-            logger.warning(f"Message too long ({len(text)} chars), truncating")
-                # Find a good breaking point
-                truncated = text[:MAX_MESSAGE_LENGTH-100]
-                
-                # Try to break at a paragraph
-                last_newline = truncated.rfind('\n\n')
-                if last_newline > MAX_MESSAGE_LENGTH * 0.8:  # If we can keep at least 80% of the text
-                    truncated = truncated[:last_newline]
-                    
-                # Add indicator that text was truncated
-                truncated += "\n\n<i>... (message truncated)</i>"
-                
-                # Try to edit message text with truncated content
-                await query.edit_message_text(
-                    text=truncated,
-                    reply_markup=keyboard,
-                    parse_mode=parse_mode
-                )
-                return True
-        else:
-                # Normal case - message is within limits
-                # Try to edit message text first
-                await query.edit_message_text(
-                    text=text,
-                    reply_markup=keyboard,
-                    parse_mode=parse_mode
-                )
-                return True
-    except Exception as e:
-        logger.warning(f"Could not update message text: {str(e)}")
-            
-            # If text update fails, try to edit caption
-        try:
-                # Check if caption is too long
-                MAX_CAPTION_LENGTH = 1000  # Slightly under the 1024 limit for safety
-                
-                if len(text) > MAX_CAPTION_LENGTH:
-                logger.warning(f"Caption too long ({len(text)} chars), truncating")
-                    # Find a good breaking point
-                    truncated = text[:MAX_CAPTION_LENGTH-100]
-                    
-                    # Try to break at a paragraph
-                    last_newline = truncated.rfind('\n\n')
-                    if last_newline > MAX_CAPTION_LENGTH * 0.8:  # If we can keep at least 80% of the text
-                        truncated = truncated[:last_newline]
-                        
-                    # Add indicator that text was truncated
-                    truncated += "\n\n<i>... (message truncated)</i>"
-                    
-                    # Use truncated text for caption
-                    await query.edit_message_caption(
-                        caption=truncated,
-                        reply_markup=keyboard,
-                        parse_mode=parse_mode
-                    )
-            else:
-                    # Caption is within limits
-                    await query.edit_message_caption(
-                        caption=text,
-                        reply_markup=keyboard,
-                        parse_mode=parse_mode
-                    )
-                return True
-            except Exception as e2:
-            logger.error(f"Could not update caption either: {str(e2)}")
-                
-                # As a last resort, send a new message
-            try:
-                    chat_id = query.message.chat_id
-                    
-                    # Check if message is too long
-                    MAX_MESSAGE_LENGTH = 4000  # Telegram message limit
-                    
-                    if len(text) > MAX_MESSAGE_LENGTH:
-                    logger.warning(f"New message too long ({len(text)} chars), truncating")
-                        # Find a good breaking point
-                        truncated = text[:MAX_MESSAGE_LENGTH-100]
-                        
-                        # Try to break at a paragraph
-                        last_newline = truncated.rfind('\n\n')
-                        if last_newline > MAX_MESSAGE_LENGTH * 0.8:  # If we can keep at least 80% of the text
-                            truncated = truncated[:last_newline]
-                            
-                        # Add indicator that text was truncated
-                        truncated += "\n\n<i>... (message truncated)</i>"
-                        
-                        # Use truncated text for new message
-                        await query.bot.send_message(
-                            chat_id=chat_id,
-                            text=truncated,
-                            reply_markup=keyboard,
-                            parse_mode=parse_mode
-                        )
-                else:
-                        # Message is within limits
-                        await query.bot.send_message(
-                            chat_id=chat_id,
-                            text=text,
-                            reply_markup=keyboard,
-                            parse_mode=parse_mode
-                        )
-                    return True
-                except Exception as e3:
-                logger.error(f"Failed to send new message: {str(e3)}")
-                    return False
-    
-    # Missing handler implementations
-    async def back_signals_callback(self, update: Update, context=None) -> int:
-        """Handle back_signals button press"""
-        query = update.callback_query
-        await query.answer()
-        
-        logger.info("back_signals_callback called")
-        
-        # Make sure we're in the signals flow context
-        if context and hasattr(context, 'user_data'):
-            # Reset signal flow flags
-            context.user_data['from_signal'] = False
-            context.user_data['in_signal_flow'] = False
-            logger.info(f"Reset signal flow flags: from_signal=False, in_signal_flow=False")
-            # Keep is_signals_context flag but reset from_signal flag
-            context.user_data['is_signals_context'] = True
-            context.user_data['from_signal'] = False
-            
-            # Clear other specific analysis keys but maintain signals context
-            keys_to_remove = [
-                'instrument', 'market', 'analysis_type', 'timeframe', 
-                'signal_id', 'signal_instrument', 'signal_direction', 'signal_timeframe',
-                'loading_message'
-            ]
-
-            for key in keys_to_remove:
-                if key in context.user_data:
-                    del context.user_data[key]
-            logger.info(f"Updated context in back_signals_callback: {context.user_data}")
-        
-        # Create keyboard for signal menu
-        keyboard = [
-            [InlineKeyboardButton("📊 Add Signal", callback_data="signals_add")],
-            [InlineKeyboardButton("⚙️ Manage Signals", callback_data="signals_manage")],
-            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # Get the signals GIF URL for better UX
-        signals_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
-        
-        # Update the message
-        await self.update_message(
-            query=query,
-            text="<b>📈 Signal Management</b>\n\nManage your trading signals",
-            keyboard=reply_markup
-        )
-        
-        return SIGNALS
-        
-    async def get_subscribers_for_instrument(self, instrument: str, timeframe: str = None) -> List[int]:
-        """
-        Get a list of subscribed user IDs for a specific instrument and timeframe
-        
-        Args:
-            instrument: The trading instrument (e.g., EURUSD)
-            timeframe: Optional timeframe filter
-            
-        Returns:
-            List of subscribed user IDs
-        """
-    try:
-            logger.info(f"Getting subscribers for {instrument} timeframe: {timeframe}")
-            
-            # Get all subscribers from the database
-            # Note: Using get_signal_subscriptions instead of find_all
-            subscribers = await self.db.get_signal_subscriptions(instrument, timeframe)
-            
-            if not subscribers:
-            logger.warning(f"No subscribers found for {instrument}")
-                return []
-                
-            # Filter out subscribers that don't have an active subscription
-            active_subscribers = []
-            for subscriber in subscribers:
-                user_id = subscriber['user_id']
-                
-                # Check if user is subscribed
-                is_subscribed = await self.db.is_user_subscribed(user_id)
-                
-                # Check if payment has failed
-                payment_failed = await self.db.has_payment_failed(user_id)
-                
-                if is_subscribed and not payment_failed:
-                    active_subscribers.append(user_id)
-            else:
-                    logger.info(f"User {user_id} doesn't have an active subscription, skipping signal")
-            
-            return active_subscribers
-            
-    except Exception as e:
-        logger.error(f"Error getting subscribers: {str(e)}")
-            # FOR TESTING: Add admin users if available
-            if hasattr(self, 'admin_users') and self.admin_users:
-                logger.info(f"Returning admin users for testing: {self.admin_users}")
-                return self.admin_users
-            return []
-
-    async def process_signal(self, signal_data: Dict[str, Any]) -> bool:
-        """
-        Process a trading signal from TradingView webhook or API
-        
-        Supports two formats:
-        1. TradingView format: instrument, signal, price, sl, tp1, tp2, tp3, interval
-        2. Custom format: instrument, direction, entry, stop_loss, take_profit, timeframe
-        
-        Returns:
-            bool: True if signal was processed successfully, False otherwise
-        """
-    try:
-            # Log the incoming signal data
-            logger.info(f"Processing signal: {signal_data}")
-            
-            # Check which format we're dealing with and normalize it
-            instrument = signal_data.get('instrument')
-            
-            # Handle TradingView format (price, sl, interval)
-            if 'price' in signal_data and 'sl' in signal_data:
-                price = signal_data.get('price')
-                sl = signal_data.get('sl')
-                tp1 = signal_data.get('tp1')
-                tp2 = signal_data.get('tp2')
-                tp3 = signal_data.get('tp3')
-                interval = signal_data.get('interval', '1h')
-                
-                # Determine signal direction based on price and SL relationship
-                direction = "BUY" if float(sl) < float(price) else "SELL"
-                
-                # Create normalized signal data
-                normalized_data = {
-                    'instrument': instrument,
-                    'direction': direction,
-                    'entry': price,
-                    'stop_loss': sl,
-                    'take_profit': tp1,  # Use first take profit level
-                    'timeframe': interval
-                }
-                
-                # Add optional fields if present
-                normalized_data['tp1'] = tp1
-                normalized_data['tp2'] = tp2
-                normalized_data['tp3'] = tp3
-            
-            # Handle custom format (direction, entry, stop_loss, timeframe)
-            elif 'direction' in signal_data and 'entry' in signal_data:
-                direction = signal_data.get('direction')
-                entry = signal_data.get('entry')
-                stop_loss = signal_data.get('stop_loss')
-                take_profit = signal_data.get('take_profit')
-                timeframe = signal_data.get('timeframe', '1h')
-                
-                # Create normalized signal data
-                normalized_data = {
-                    'instrument': instrument,
-                    'direction': direction,
-                    'entry': entry,
-                    'stop_loss': stop_loss,
-                    'take_profit': take_profit,
-                    'timeframe': timeframe
-                }
-        else:
-            logger.error(f"Missing required signal data")
-                return False
-            
-            # Basic validation
-            if not normalized_data.get('instrument') or not normalized_data.get('direction') or not normalized_data.get('entry'):
-            logger.error(f"Missing required fields in normalized signal data: {normalized_data}")
-                return False
-                
-            # Create signal ID for tracking
-            signal_id = f"{normalized_data['instrument']}_{normalized_data['direction']}_{normalized_data['timeframe']}_{int(time.time())}"
-            
-            # Format the signal message
-            message = self._format_signal_message(normalized_data)
-            
-            # Determine market type for the instrument
-            market_type = _detect_market(instrument)
-            
-            # Store the full signal data for reference
-            normalized_data['id'] = signal_id
-            normalized_data['timestamp'] = datetime.now().isoformat()
-            normalized_data['message'] = message
-            normalized_data['market'] = market_type
-            
-            # Save signal for history tracking
-            if not os.path.exists(self.signals_dir):
-                os.makedirs(self.signals_dir, exist_ok=True)
-                
-            # Save to signals directory
-            with open(f"{self.signals_dir}/{signal_id}.json", 'w') as f:
-                json.dump(normalized_data, f)
-            
-            # FOR TESTING: Always send to admin for testing
-            if hasattr(self, 'admin_users') and self.admin_users:
-            try:
-                    logger.info(f"Sending signal to admin users for testing: {self.admin_users}")
-                    for admin_id in self.admin_users:
-                        # Prepare keyboard with analysis options
-                        keyboard = [
-                            [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
-                        ]
-                        
-                        # Send the signal
-                        await self.bot.send_message(
-                            chat_id=admin_id,
-                            text=message,
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=InlineKeyboardMarkup(keyboard)
-                        )
-                        logger.info(f"Test signal sent to admin {admin_id}")
-                        
-                        # Store signal reference for quick access
-                        if not hasattr(self, 'user_signals'):
-                            self.user_signals = {}
-                            
-                        admin_str_id = str(admin_id)
-                        if admin_str_id not in self.user_signals:
-                            self.user_signals[admin_str_id] = {}
-                        
-                        self.user_signals[admin_str_id][signal_id] = normalized_data
-            except Exception as e:
-                logger.error(f"Error sending test signal to admin: {str(e)}")
-            
-            # Get subscribers for this instrument
-            timeframe = normalized_data.get('timeframe', '1h')
-            subscribers = await self.get_subscribers_for_instrument(instrument, timeframe)
-            
-            if not subscribers:
-            logger.warning(f"No subscribers found for {instrument}")
-                return True  # Successfully processed, just no subscribers
-            
-            # Send signal to all subscribers
-            logger.info(f"Sending signal {signal_id} to {len(subscribers)} subscribers")
-            
-            sent_count = 0
-            for user_id in subscribers:
-            try:
-                    # Prepare keyboard with analysis options
-                    keyboard = [
-                        [InlineKeyboardButton("🔍 Analyze Market", callback_data=f"analyze_from_signal_{instrument}_{signal_id}")]
-                    ]
-                    
-                    # Send the signal
-                    await self.bot.send_message(
-                        chat_id=user_id,
-                        text=message,
-                        parse_mode=ParseMode.HTML,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-                    
-                    sent_count += 1
-                    
-                    # Store signal reference for quick access
-                    if not hasattr(self, 'user_signals'):
-                        self.user_signals = {}
-                        
-                    user_str_id = str(user_id)
-                    if user_str_id not in self.user_signals:
-                        self.user_signals[user_str_id] = {}
-                    
-                    self.user_signals[user_str_id][signal_id] = normalized_data
-                    
-            except Exception as e:
-                logger.error(f"Error sending signal to user {user_id}: {str(e)}")
-            
-            logger.info(f"Successfully sent signal {signal_id} to {sent_count}/{len(subscribers)} subscribers")
-            return True
-            
-    except Exception as e:
-        logger.error(f"Error processing signal: {str(e)}")
-        logger.exception(e)
-            return False
-
-    def _format_signal_message(self, signal_data: Dict[str, Any]) -> str:
-        """Format signal data into a nice message for Telegram"""
-    try:
-            # Extract fields from signal data
-            instrument = signal_data.get('instrument', 'Unknown')
-            direction = signal_data.get('direction', 'Unknown')
-            entry = signal_data.get('entry', 'Unknown')
-            stop_loss = signal_data.get('stop_loss')
-            take_profit = signal_data.get('take_profit')
-            timeframe = signal_data.get('timeframe', '1h')
-            
-            # Get multiple take profit levels if available
-            tp1 = signal_data.get('tp1', take_profit)
-            tp2 = signal_data.get('tp2')
-            tp3 = signal_data.get('tp3')
-            
-            # Add emoji based on direction
-            direction_emoji = "🟢" if direction.upper() == "BUY" else "🔴"
-            
-            # Format the message with multiple take profits if available
-            message = f"<b>🎯 New Trading Signal 🎯</b>\n\n"
-            message += f"<b>Instrument:</b> {instrument}\n"
-            message += f"<b>Action:</b> {direction.upper()} {direction_emoji}\n\n"
-            message += f"<b>Entry Price:</b> {entry}\n"
-            
-            if stop_loss:
-                message += f"<b>Stop Loss:</b> {stop_loss} 🔴\n"
-            
-            # Add take profit levels
-            if tp1:
-                message += f"<b>Take Profit 1:</b> {tp1} 🎯\n"
-            if tp2:
-                message += f"<b>Take Profit 2:</b> {tp2} 🎯\n"
-            if tp3:
-                message += f"<b>Take Profit 3:</b> {tp3} 🎯\n"
-            
-            message += f"\n<b>Timeframe:</b> {timeframe}\n"
-            message += f"<b>Strategy:</b> TradingView Signal\n\n"
-            
-            message += "————————————————————\n\n"
-            message += "<b>Risk Management:</b>\n"
-            message += "• Position size: 1-2% max\n"
-            message += "• Use proper stop loss\n"
-            message += "• Follow your trading plan\n\n"
-            
-            message += "————————————————————\n\n"
-            
-            # Generate AI verdict
-            ai_verdict = f"The {instrument} {direction.lower()} signal shows a promising setup with defined entry at {entry} and stop loss at {stop_loss}. Multiple take profit levels provide opportunities for partial profit taking."
-            message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
-            
-            return message
-            
-    except Exception as e:
-        logger.error(f"Error formatting signal message: {str(e)}")
-            # Return simple message on error
-            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
-
-    def _register_handlers(self, application):
-        """Register event handlers for bot commands and callback queries"""
-    try:
-            logger.info("Registering command handlers")
-            
-            # Initialize the application without using run_until_complete
-        try:
-                # Instead of using loop.run_until_complete, directly call initialize 
-                # which will be properly awaited by the caller
-                self.init_task = application.initialize()
-                logger.info("Telegram application initialization ready to be awaited")
-            except Exception as init_e:
-            logger.error(f"Error during application initialization: {str(init_e)}")
-            logger.exception(init_e)
-                
-            # Set bot commands for menu
-            commands = [
-                BotCommand("start", "Start the bot and get the welcome message"),
-                BotCommand("menu", "Show the main menu"),
-                BotCommand("help", "Show available commands and how to use the bot")
-            ]
-            
-            # Store the set_commands_task to be awaited later
-        try:
-                # Instead of asyncio.create_task, we will await this in the startup event
-                self.set_commands_task = self.bot.set_my_commands(commands)
-                logger.info("Bot commands ready to be set")
-            except Exception as cmd_e:
-            logger.error(f"Error preparing bot commands: {str(cmd_e)}")
-            
-            # Register command handlers
-            application.add_handler(CommandHandler("start", self.start_command))
-            application.add_handler(CommandHandler("menu", self.menu_command))
-            application.add_handler(CommandHandler("help", self.help_command))
-            
-            # Register secret admin commands
-            application.add_handler(CommandHandler("set_subscription", self.set_subscription_command))
-            application.add_handler(CommandHandler("set_payment_failed", self.set_payment_failed_command))
-            logger.info("Registered secret admin commands")
-            
-            # Register callback handlers
-            application.add_handler(CallbackQueryHandler(self.menu_analyse_callback, pattern="^menu_analyse$"))
-            application.add_handler(CallbackQueryHandler(self.menu_signals_callback, pattern="^menu_signals$"))
-            application.add_handler(CallbackQueryHandler(self.signals_add_callback, pattern="^signals_add$"))
-            application.add_handler(CallbackQueryHandler(self.signals_manage_callback, pattern="^signals_manage$"))
-            application.add_handler(CallbackQueryHandler(self.market_callback, pattern="^market_"))
-            application.add_handler(CallbackQueryHandler(self.instrument_callback, pattern="^instrument_(?!.*_signals)"))
-            application.add_handler(CallbackQueryHandler(self.instrument_signals_callback, pattern="^instrument_.*_signals$"))
-            
-            # Add handler for back buttons
-            application.add_handler(CallbackQueryHandler(self.back_market_callback, pattern="^back_market$"))
-            application.add_handler(CallbackQueryHandler(self.back_instrument_callback, pattern="^back_instrument$"))
-            application.add_handler(CallbackQueryHandler(self.back_signals_callback, pattern="^back_signals$"))
-            application.add_handler(CallbackQueryHandler(self.back_menu_callback, pattern="^back_menu$"))
-            
-            # Analysis handlers for regular flow
-            application.add_handler(CallbackQueryHandler(self.analysis_technical_callback, pattern="^analysis_technical$"))
-            application.add_handler(CallbackQueryHandler(self.analysis_sentiment_callback, pattern="^analysis_sentiment$"))
-            application.add_handler(CallbackQueryHandler(self.analysis_calendar_callback, pattern="^analysis_calendar$"))
-            
-            # Analysis handlers for signal flow - with instrument embedded in callback
-            application.add_handler(CallbackQueryHandler(self.signal_technical_callback, pattern="^signal_flow_technical_.*$"))
-            application.add_handler(CallbackQueryHandler(self.signal_sentiment_callback, pattern="^signal_flow_sentiment_.*$"))
-            application.add_handler(CallbackQueryHandler(self.signal_calendar_callback, pattern="^signal_flow_calendar_.*$"))
-            
-            # Analysis handlers for signal flow - with instrument embedded in callback
-            application.add_handler(CallbackQueryHandler(self.signal_technical_callback, pattern="^signal_flow_technical_.*$"))
-            application.add_handler(CallbackQueryHandler(self.signal_sentiment_callback, pattern="^signal_flow_sentiment_.*$"))
-            application.add_handler(CallbackQueryHandler(self.analysis_calendar_callback, pattern="^signal_flow_calendar_.*$"))
-            
-            # Signal analysis flow handlers
-            application.add_handler(CallbackQueryHandler(self.signal_technical_callback, pattern="^signal_technical$"))
-            application.add_handler(CallbackQueryHandler(self.signal_sentiment_callback, pattern="^signal_sentiment$"))
-            application.add_handler(CallbackQueryHandler(self.signal_calendar_callback, pattern="^signal_calendar$"))
-            application.add_handler(CallbackQueryHandler(self.signal_calendar_callback, pattern="^signal_flow_calendar_.*$"))
-            application.add_handler(CallbackQueryHandler(self.back_to_signal_callback, pattern="^back_to_signal$"))
-            application.add_handler(CallbackQueryHandler(self.back_to_signal_analysis_callback, pattern="^back_to_signal_analysis$"))
-            
-            # Signal from analysis
-            application.add_handler(CallbackQueryHandler(self.analyze_from_signal_callback, pattern="^analyze_from_signal_.*$"))
-            
-            # Ensure back_instrument is properly handled
-            application.add_handler(CallbackQueryHandler(self.back_instrument_callback, pattern="^back_instrument$"))
-            
-            # Catch-all handler for any other callbacks
-            application.add_handler(CallbackQueryHandler(self.button_callback))
-            
-            # Don't load signals here - it will be done in initialize_services
-            # self._load_signals()
-            
-            logger.info("Bot setup completed successfully")
-            
-    except Exception as e:
-        logger.error(f"Error setting up bot handlers: {str(e)}")
-        logger.exception(e)
-
+# Calendar service helpers
     @property
     def signals_enabled(self):
         """Get whether signals processing is enabled"""
@@ -1392,183 +759,54 @@ class TelegramService:
         logger.info(f"Signal processing is now {'enabled' if value else 'disabled'}")
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
-# Import necessary modules for improved logging
-import os
-import sys
-import json
-import logging
-import logging.config
-from datetime import datetime
-
-# Setup detailed logging configuration
-def setup_logging(log_level=None):
-    """Configure structured logging for the application"""
-    log_level = log_level or os.environ.get("LOG_LEVEL", "INFO").upper()
-    
-    # Create logs directory if it doesn't exist
-    os.makedirs("logs", exist_ok=True)
-    
-    # Generate a log filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = f"logs/trading_bot_{timestamp}.log"
-    
-    # Define logging configuration
-    logging_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "standard": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            },
-            "detailed": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "level": log_level,
-                "formatter": "standard",
-                "stream": "ext://sys.stdout"
-            },
-            "file": {
-                "class": "logging.FileHandler",
-                "level": "DEBUG",
-                "formatter": "detailed",
-                "filename": log_file,
-                "encoding": "utf8"
-            }
-        },
-        "loggers": {
-            "": {  # Root logger
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": True
-            },
-            "trading_bot": {
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": False
-            },
-            "trading_bot.services": {
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": False
-            }
-        }
-    }
-    
-    # Apply the configuration
-def setup_logging():
-    """Configure logging for the application"""
-    import logging
-    import logging.config
-    import os
-    import sys
-    import json
-    
-    # Create logs directory if it doesn't exist
-    log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # Set log file path
-    log_file = os.path.join(log_dir, "trading_bot.log")
-    
-    # Determine log level from environment or default to INFO
-    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-    
-    # Configure logging
-    # Create logs directory if it doesn't exist
-    log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # Set log file path
-    log_file = os.path.join(log_dir, "trading_bot.log")
-    
-    # Determine log level from environment or default to INFO
-    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-    
-    # Define logging configuration
-    logging_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "standard": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            },
-            "detailed": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "level": log_level,
-                "formatter": "standard",
-                "stream": "ext://sys.stdout"
-            },
-            "file": {
-                "class": "logging.FileHandler",
-                "level": "DEBUG",
-                "formatter": "detailed",
-                "filename": log_file,
-                "encoding": "utf8"
-            }
-        },
-        "loggers": {
-            "": {  # Root logger
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": True
-            },
-            "trading_bot": {
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": False
-            },
-            "trading_bot.services": {
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": False
-            }
-        }
-    }
-
-    logging.config.dictConfig(logging_config)
-    
-    # Log startup information
-    logger = logging.getLogger(__name__)
-    logger.info(f"Logging configured with level {log_level}, writing to {log_file}")
-    logger.info(f"Python version: {sys.version}")
-    logger.info(f"Running on platform: {sys.platform}")
-    
-    # Log environment variables (excluding sensitive information)
-    safe_env = {}
-    for key, value in os.environ.items():
-        if any(sensitive in key.lower() for sensitive in ['key', 'token', 'secret', 'password', 'pwd']):
-            safe_env[key] = f"{value[:3]}...{value[-3:]}" if len(value) > 6 else "[REDACTED]"
-    else:
-            safe_env[key] = value
-    
-    logger.debug(f"Environment variables: {json.dumps(safe_env, indent=2)}")
-    
-    return logger
-
-    async def _get_signal_related_trades(self, signal_id):
-    """Retrieve related trades from the database"""
-    try:
-        # Fetch the related trades data from the database
-        trades_data = await self.db.get_related_trades(signal_id)
-            
-        if trades_data:
-            return trades_data
+        """Handle the /start command"""
+        user = update.effective_user
+        logger.info(f"User {user.id} ({user.username}) started the bot")
+        
+        # Check if user is subscribed
+        is_subscribed = await self.db.is_user_subscribed(user.id)
+        
+        # Create welcome message
+        welcome_text = (
+            f"👋 Welcome to SigmaPips Trading Bot, {user.first_name}!\n\n"
+            "I'm your AI-powered trading assistant. Here's what I can do for you:\n\n"
+            "📊 <b>Market Analysis</b> - Technical and sentiment analysis for major markets\n"
+            "📈 <b>Signal Management</b> - Receive and manage trading signals\n"
+            "📅 <b>Economic Calendar</b> - Stay updated with important economic events\n\n"
+        )
+        
+        # Add subscription status
+        if is_subscribed:
+            welcome_text += "✅ <b>Subscription Status:</b> Active\n\n"
         else:
-            logger.warning(f"No related trades data found for signal ID {signal_id}")
-            return None
-    except Exception as e:
-        logger.error(f"Error retrieving related trades: {str(e)}")
-        logger.exception(e)
-        return None
+            welcome_text += "❌ <b>Subscription Status:</b> Inactive\n\n"
+        
+        welcome_text += "Use the /menu command to access all features."
+        
+        # Create keyboard for main menu
+        keyboard = [
+            [InlineKeyboardButton("📊 Analyze Markets", callback_data="menu_analyse")],
+            [InlineKeyboardButton("📈 Signal Management", callback_data="menu_signals")],
+            [InlineKeyboardButton("❓ Help", callback_data="menu_help")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send welcome message with keyboard
+        await update.message.reply_html(
+            welcome_text,
+            reply_markup=reply_markup
+        )
+        
+        # Log the user interaction
+        logger.info(f"Sent welcome message to user {user.id}")
+        
+        # Store user data if needed
+        if context:
+            context.user_data['is_signals_context'] = False
+            context.user_data['from_signal'] = False
+            context.user_data['in_signal_flow'] = False
+        
+        return MAIN_MENU
 
 # Initialize logging early in the application startup
 logger = setup_logging()
@@ -2096,7 +1334,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-    else:
+        else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -2114,7 +1352,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-        else:
+            else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -2155,7 +1393,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-        else:
+            else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -2182,7 +1420,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -2341,9 +1579,7 @@ class TelegramService:
         """Format the calendar data into a readable HTML message"""
         self.logger.info(f"Formatting calendar data with {len(calendar_data)} events")
         if not calendar_data:
-            return "<b>📅 Economic Calendar</b>
-
-No economic events found for today."
+            return "<b>📅 Economic Calendar</b>\n\nNo economic events found for today."
         
         # Sort events by time
     try:
@@ -2368,20 +1604,14 @@ No economic events found for today."
             sorted_events = calendar_data
         
         # Format the message
-        message = "<b>📅 Economic Calendar</b>
-
-"
+        message = "<b>📅 Economic Calendar</b>\n\n"
         
         # Get current date
         current_date = datetime.now().strftime("%B %d, %Y")
-        message += f"<b>Date:</b> {current_date}
-
-"
+        message += f"<b>Date:</b> {current_date}\n\n"
         
         # Add impact legend
-        message += "<b>Impact:</b> 🔴 High   🟠 Medium   🟢 Low
-
-"
+        message += "<b>Impact:</b> 🔴 High   🟠 Medium   🟢 Low\n\n"
         
         # Group events by country
         events_by_country = {}
@@ -2394,8 +1624,7 @@ No economic events found for today."
         # Format events by country
         for country, events in events_by_country.items():
             country_flag = CURRENCY_FLAG.get(country, '')
-            message += f"<b>{country_flag} {country}</b>
-"
+            message += f"<b>{country_flag} {country}</b>\n"
             
             for event in events:
                 time = event.get('time', 'TBA')
@@ -2403,11 +1632,9 @@ No economic events found for today."
                 impact = event.get('impact', 'Low')
                 impact_emoji = {'High': '🔴', 'Medium': '🟠', 'Low': '🟢'}.get(impact, '🟢')
                 
-                message += f"{time} - {impact_emoji} {title}
-"
+                message += f"{time} - {impact_emoji} {title}\n"
             
-            message += "
-"  # Add extra newline between countries
+            message += "\n"  # Add extra newline between countries
         
         return message
         
@@ -2439,16 +1666,12 @@ No economic events found for today."
                 truncated = text[:MAX_MESSAGE_LENGTH-100]
                 
                 # Try to break at a paragraph
-                last_newline = truncated.rfind('
-
-')
+                last_newline = truncated.rfind('\n\n')
                 if last_newline > MAX_MESSAGE_LENGTH * 0.8:  # If we can keep at least 80% of the text
                     truncated = truncated[:last_newline]
                     
                 # Add indicator that text was truncated
-                truncated += "
-
-<i>... (message truncated)</i>"
+                truncated += "\n\n<i>... (message truncated)</i>"
                 
                 # Try to edit message text with truncated content
                 await query.edit_message_text(
@@ -2480,16 +1703,12 @@ No economic events found for today."
                     truncated = text[:MAX_CAPTION_LENGTH-100]
                     
                     # Try to break at a paragraph
-                    last_newline = truncated.rfind('
-
-')
+                    last_newline = truncated.rfind('\n\n')
                     if last_newline > MAX_CAPTION_LENGTH * 0.8:  # If we can keep at least 80% of the text
                         truncated = truncated[:last_newline]
                         
                     # Add indicator that text was truncated
-                    truncated += "
-
-<i>... (message truncated)</i>"
+                    truncated += "\n\n<i>... (message truncated)</i>"
                     
                     # Use truncated text for caption
                     await query.edit_message_caption(
@@ -2521,16 +1740,12 @@ No economic events found for today."
                         truncated = text[:MAX_MESSAGE_LENGTH-100]
                         
                         # Try to break at a paragraph
-                        last_newline = truncated.rfind('
-
-')
+                        last_newline = truncated.rfind('\n\n')
                         if last_newline > MAX_MESSAGE_LENGTH * 0.8:  # If we can keep at least 80% of the text
                             truncated = truncated[:last_newline]
                             
                         # Add indicator that text was truncated
-                        truncated += "
-
-<i>... (message truncated)</i>"
+                        truncated += "\n\n<i>... (message truncated)</i>"
                         
                         # Use truncated text for new message
                         await query.bot.send_message(
@@ -3529,7 +2744,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-    else:
+        else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -3547,7 +2762,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-        else:
+            else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -3588,7 +2803,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-        else:
+            else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -3615,7 +2830,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -4400,7 +3615,7 @@ class TelegramService:
         self._signals_enabled = bool(value)
         logger.info(f"Signal processing is now {'enabled' if value else 'disabled'}")
 
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
+        async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
         """Send a welcome message when the bot is started."""
         user = update.effective_user
         user_id = user.id
@@ -4532,7 +3747,7 @@ Start today with a FREE 14-day trial!
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-        else:
+            else:
                 message = f"❌ Could not set payment failed status for user {chat_id}"
             logger.error("Database returned failure")
                 await update.message.reply_text(message)
@@ -4704,7 +3919,7 @@ Start today with a FREE 14-day trial!
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-        else:
+            else:
                 # Skip GIF mode - just send text
                 if hasattr(update, 'message') and update.message:
                     await update.message.reply_text(
@@ -4787,7 +4002,7 @@ Start today with a FREE 14-day trial!
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-        else:
+            else:
                 # Re-raise for other errors
                 raise
         
@@ -4848,7 +4063,7 @@ Start today with a FREE 14-day trial!
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-        else:
+            else:
                 # Re-raise for other errors
                 raise
         
@@ -5338,7 +4553,7 @@ Start today with a FREE 14-day trial!
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-        else:
+            else:
                 # Re-raise for other errors
                 raise
         return CHOOSE_ANALYSIS
@@ -6626,7 +5841,7 @@ def require_subscription(func):
         if is_subscribed and not payment_failed:
             # User has subscription, proceed with function
             return await func(self, update, context, *args, **kwargs)
-    else:
+        else:
             if payment_failed:
                 # Show payment failure message
                 failed_payment_text = f"""
@@ -6644,7 +5859,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 keyboard = [
                     [InlineKeyboardButton("🔄 Reactivate Subscription", url=reactivation_url)]
                 ]
-        else:
+            else:
                 # Show subscription screen with the welcome message from the screenshot
                 failed_payment_text = f"""
 🚀 <b>Welcome to Sigmapips AI!</b> 🚀
@@ -6685,7 +5900,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
-        else:
+            else:
                 await update.message.reply_text(
                     text=failed_payment_text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -6712,7 +5927,7 @@ if OPENAI_API_KEY:
     # Validate the key format
     from trading_bot.config import validate_openai_key
     if not validate_openai_key(OPENAI_API_KEY):
-    logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
+        logger.warning("OpenAI API key format is invalid. AI services may not work correctly.")
 else:
     logger.warning("No OpenAI API key configured. AI services will be disabled.")
     
@@ -7497,7 +6712,7 @@ class TelegramService:
         self._signals_enabled = bool(value)
         logger.info(f"Signal processing is now {'enabled' if value else 'disabled'}")
 
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
+        async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None) -> None:
         """Send a welcome message when the bot is started."""
         user = update.effective_user
         user_id = user.id
@@ -7807,7 +7022,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
-        else:
+            else:
                 # Skip GIF mode - just send text
                 if hasattr(update, 'message') and update.message:
                     await update.message.reply_text(
@@ -7890,7 +7105,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-        else:
+            else:
                 # Re-raise for other errors
                 raise
         
@@ -7951,7 +7166,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
                         parse_mode=ParseMode.HTML
                     )
-        else:
+            else:
                 # Re-raise for other errors
                 raise
         
@@ -8441,7 +7656,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             reply_markup=InlineKeyboardMarkup(SIGNAL_ANALYSIS_KEYBOARD),
                             parse_mode=ParseMode.HTML
                         )
-        else:
+            else:
                 # Re-raise for other errors
                 raise
         return CHOOSE_ANALYSIS
