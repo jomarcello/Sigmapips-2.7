@@ -2745,6 +2745,39 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             if callback_data == "signals_manage" or callback_data == CALLBACK_SIGNALS_MANAGE:
                 return await self.signals_manage_callback(update, context)
             
+            # Signal flow handling
+            # Check if we're in signal flow and handle accordingly
+            if context and hasattr(context, 'user_data') and context.user_data.get('in_signal_flow', False):
+                # Handle signal flow technical analysis
+                if callback_data.startswith("signal_flow_technical_"):
+                    parts = callback_data.split("_")
+                    if len(parts) >= 4:
+                        instrument = parts[3]  # Extract instrument from callback data
+                        logger.info(f"Routing signal flow technical analysis for instrument: {instrument}")
+                        if context and hasattr(context, 'user_data'):
+                            context.user_data['instrument'] = instrument
+                        return await self.signal_technical_callback(update, context)
+                
+                # Handle signal flow sentiment analysis
+                elif callback_data.startswith("signal_flow_sentiment_"):
+                    parts = callback_data.split("_")
+                    if len(parts) >= 4:
+                        instrument = parts[3]  # Extract instrument from callback data
+                        logger.info(f"Routing signal flow sentiment analysis for instrument: {instrument}")
+                        if context and hasattr(context, 'user_data'):
+                            context.user_data['instrument'] = instrument
+                        return await self.signal_sentiment_callback(update, context)
+                
+                # Handle signal flow calendar analysis
+                elif callback_data.startswith("signal_flow_calendar_"):
+                    parts = callback_data.split("_")
+                    if len(parts) >= 4:
+                        instrument = parts[3]  # Extract instrument from callback data
+                        logger.info(f"Routing signal flow calendar analysis for instrument: {instrument}")
+                        if context and hasattr(context, 'user_data'):
+                            context.user_data['instrument'] = instrument
+                        return await self.signal_calendar_callback(update, context)
+            
             # Back navigation handlers
             if callback_data == "back_menu" or callback_data == CALLBACK_BACK_MENU:
                 return await self.back_menu_callback(update, context)
