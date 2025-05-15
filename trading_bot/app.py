@@ -13,6 +13,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import importlib.util
 
+# Add the parent directory to the path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import signal interceptor
+from trading_bot.services.signal_interceptor import SignalInterceptor
+from trading_bot.services.signal_storage_service import SignalStorageService
+
 # Set up logger
 logger = logging.getLogger("trading_bot.api")
 
@@ -23,6 +30,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Initialize signal interceptor
+signal_interceptor = None
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +41,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    global signal_interceptor
+    signal_interceptor = SignalInterceptor()
+    await signal_interceptor.setup()
+    logger.info("Signal interceptor initialized successfully")
 
 @app.get("/")
 async def root():
@@ -81,6 +99,9 @@ async def health_check():
             "calendar": {
                 "use_calendar_fallback": os.environ.get("USE_CALENDAR_FALLBACK", "false").lower() == "true",
                 "use_scrapingant": os.environ.get("USE_SCRAPINGANT", "false").lower() == "true",
+            },
+            "signal_storage": {
+                "initialized": signal_interceptor is not None
             }
         },
         "logs": {
@@ -153,7 +174,18 @@ async def receive_signal(request: Request):
         
         # Log the parsed data
         logger.info(f"Signal data: {data}")
-        
+
+        # Store signal using SignalInterceptor for persistence
+        global signal_interceptor
+        if signal_interceptor:
+            # Get any user ID if present, otherwise use default
+            user_id = data.get("user_id", "default")
+            # Store the signal using the interceptor
+            signal_id = await signal_interceptor.intercept_signal(data, user_id)
+            logger.info(f"Signal {signal_id} stored successfully via SignalInterceptor")
+        else:
+            logger.warning("Signal interceptor not available - signal will not be stored for persistence")
+            
         # Log the webhook URL being used
         webhook_url = os.environ.get("WEBHOOK_URL", "https://sigmapips-27-production.up.railway.app")
         logger.info(f"Processing signal using webhook URL: {webhook_url}")
@@ -172,7 +204,7 @@ async def receive_signal(request: Request):
             
             if result:
                 logger.info(f"Signal processed successfully via webhook URL: {webhook_url}")
-                return {"status": "success", "message": "Signal processed successfully"}
+                return {"status": "success", "message": f"Signal {signal_id if signal_interceptor else 'unknown'} processed and stored successfully"}
             else:
                 logger.error(f"Failed to process signal via webhook URL: {webhook_url}")
                 return {"status": "error", "message": "Failed to process signal"}
