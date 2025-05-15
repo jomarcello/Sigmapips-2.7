@@ -2,12 +2,14 @@ from supabase import create_client, Client
 import redis
 import logging
 import os
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import re
 import stripe
 import datetime
 from datetime import timezone
 import traceback
+import json
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -1144,109 +1146,95 @@ class Database:
             return []
 
     async def get_all_active_users(self) -> List[Dict]:
-        """Get all active users from the database
-        
-        Returns:
-            List[Dict]: List of user records
-        """
+        """Get all active users from the database"""
         try:
-            # Get users from the users table
-            response = self.supabase.table('users').select('*').execute()
+            if self.use_mock_data:
+                return self.mock_users
             
-            if response and response.data:
-                logger.info(f"Found {len(response.data)} users in the database")
-                return response.data
-            else:
-                logger.info("No users found in the database")
-                return []
-                
+            # Get users from Supabase
+            data = self.supabase.table("users").select("*").eq("is_active", True).execute()
+            return data.data
         except Exception as e:
-            logger.error(f"Error getting all active users: {str(e)}")
-            traceback.print_exc()
+            logger.error(f"Error getting active users: {str(e)}")
             return []
 
     def check_bot_instance(self, instance_id):
-        """
-        Check if a bot instance is registered and active.
-        If not found, register this instance.
-        If found, update its heartbeat.
+        """Check if this bot instance is already running"""
+        if not self.using_redis:
+            return False  # Can't check without Redis
+        
+        try:
+            # Check if the instance ID is already in Redis
+            existing = self.redis.get(f"bot_instance:{instance_id}")
+            if existing:
+                return True
+            
+            # Set our instance with expiry (30 seconds)
+            self.redis.setex(f"bot_instance:{instance_id}", 30, "1")
+            return False
+        except Exception as e:
+            logger.error(f"Error checking bot instance: {str(e)}")
+            return False
+
+    async def save_signal_page(self, user_id: int, instrument: str, signal_page_data: Dict) -> bool:
+        """Save a signal page to persistent storage for later retrieval.
         
         Args:
-            instance_id: Unique identifier for this bot instance
+            user_id (int): Telegram user ID
+            instrument (str): Trading instrument (e.g., "EURUSD")
+            signal_page_data (Dict): Signal page data to store
             
         Returns:
-            tuple: (is_new_instance, is_active)
-                - is_new_instance: True if this is a new instance
-                - is_active: True if this instance should remain active
+            bool: Whether the operation was successful
         """
         try:
-            # Create the bot_instances table if it doesn't exist
-            self.execute_query("""
-                CREATE TABLE IF NOT EXISTS bot_instances (
-                    instance_id VARCHAR(255) PRIMARY KEY,
-                    start_time TIMESTAMP NOT NULL,
-                    last_heartbeat TIMESTAMP NOT NULL,
-                    is_active BOOLEAN DEFAULT TRUE
-                )
-            """)
+            # Generate a unique key for this user and instrument
+            key = f"signal_page:{user_id}:{instrument}"
             
-            # Check for active instances
-            active_instances = self.execute_query("""
-                SELECT instance_id, last_heartbeat 
-                FROM bot_instances 
-                WHERE is_active = TRUE AND 
-                      last_heartbeat > NOW() - INTERVAL '2 minutes'
-            """)
-            
-            # Get current time
-            import datetime
-            current_time = datetime.datetime.now()
-            
-            # Check if this instance is registered
-            instance_data = self.execute_query(
-                "SELECT instance_id, is_active FROM bot_instances WHERE instance_id = %s",
-                [instance_id]
-            )
-            
-            if not instance_data:
-                # This is a new instance
-                
-                # If there are active instances, don't activate this one
-                if active_instances and len(active_instances) > 0:
-                    # Register but don't activate
-                    self.execute_query(
-                        """
-                        INSERT INTO bot_instances 
-                        (instance_id, start_time, last_heartbeat, is_active) 
-                        VALUES (%s, %s, %s, FALSE)
-                        """,
-                        [instance_id, current_time, current_time]
-                    )
-                    return True, False
-                else:
-                    # No active instances, register and activate this one
-                    self.execute_query(
-                        """
-                        INSERT INTO bot_instances 
-                        (instance_id, start_time, last_heartbeat, is_active) 
-                        VALUES (%s, %s, %s, TRUE)
-                        """,
-                        [instance_id, current_time, current_time]
-                    )
-                    return True, True
+            if self.using_redis:
+                # Store in Redis with 24-hour expiry (86400 seconds)
+                self.redis.setex(key, 86400, json.dumps(signal_page_data))
+                logger.info(f"Saved signal page for user {user_id}, instrument {instrument} to Redis")
+                return True
             else:
-                # Instance exists, update heartbeat
-                self.execute_query(
-                    "UPDATE bot_instances SET last_heartbeat = %s WHERE instance_id = %s",
-                    [current_time, instance_id]
-                )
-                
-                # Return current active status
-                return False, instance_data[0]['is_active']
-                
+                # Local cache fallback with 1-hour expiry
+                self.cache[key] = signal_page_data
+                self.cache_expiry[key] = time.time() + 3600  # 1 hour expiry
+                logger.info(f"Saved signal page for user {user_id}, instrument {instrument} to local cache")
+                return True
         except Exception as e:
-            import logging
-            logging = logging.getLogger(__name__)
-            logging.error(f"Error checking bot instance: {e}")
-            # Default to active in case of error
-            return False, True
+            logger.error(f"Error saving signal page: {str(e)}")
+            return False
+
+    async def get_signal_page(self, user_id: int, instrument: str) -> Optional[Dict]:
+        """Retrieve a signal page from persistent storage.
+        
+        Args:
+            user_id (int): Telegram user ID
+            instrument (str): Trading instrument (e.g., "EURUSD")
+            
+        Returns:
+            Optional[Dict]: Signal page data or None if not found
+        """
+        try:
+            # Generate the unique key
+            key = f"signal_page:{user_id}:{instrument}"
+            
+            if self.using_redis:
+                # Try to get from Redis
+                data = self.redis.get(key)
+                if data:
+                    logger.info(f"Retrieved signal page for user {user_id}, instrument {instrument} from Redis")
+                    return json.loads(data)
+            else:
+                # Try local cache
+                if key in self.cache and self.cache_expiry.get(key, 0) > time.time():
+                    logger.info(f"Retrieved signal page for user {user_id}, instrument {instrument} from local cache")
+                    return self.cache[key]
+            
+            # Not found
+            logger.warning(f"Signal page not found for user {user_id}, instrument {instrument}")
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving signal page: {str(e)}")
+            return None
