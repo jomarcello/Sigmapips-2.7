@@ -1801,79 +1801,94 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             await update.message.reply_text(error_msg)
 
     async def menu_analyse_callback(self, update: Update, context=None) -> int:
-        """Handle menu_analyse button press"""
+        """Handle 'analyze markets' button from main menu."""
         query = update.callback_query
         await query.answer()
         
-        # Gebruik de juiste analyse GIF URL
-        gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
+        # Show market selection menu
+        keyboard = []
         
-        # Probeer eerst het huidige bericht te verwijderen en een nieuw bericht te sturen met de analyse GIF
-        try:
-            await query.message.delete()
-            await context.bot.send_animation(
-                chat_id=update.effective_chat.id,
-                animation=gif_url,
-                caption="Select your analysis type:",
-                reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
+        # First row - forex and crypto
+        keyboard.append([
+            InlineKeyboardButton("💱 Forex", callback_data="market_forex"),
+            InlineKeyboardButton("₿ Crypto", callback_data="market_crypto")
+        ])
+        
+        # Second row - indices and commodities
+        keyboard.append([
+            InlineKeyboardButton("📈 Indices", callback_data="market_indices"),
+            InlineKeyboardButton("🛢️ Commodities", callback_data="market_commodities")
+        ])
+        
+        # Add back button
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_menu")])
+        
+        # Update the message with the market selection buttons
+        await query.edit_message_text(
+            text="<b>Select a Market</b>\n\nChoose the market you want to analyze:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML
+        )
+        
+        return MARKET_SELECTION
+        
+    async def menu_signals_callback(self, update: Update, context=None) -> int:
+        """Handle 'Manage Signals' button from main menu."""
+        query = update.callback_query
+        await query.answer()
+        
+        # Check if user is subscribed
+        user_id = update.effective_user.id
+        is_subscribed = await self.db.is_user_subscribed(user_id)
+        
+        if not is_subscribed:
+            # If not subscribed, show subscription info
+            subscription_text = """
+<b>⭐️ Premium Feature</b>
+
+Signal management requires an active subscription. 
+
+With a subscription you can:
+• Receive real-time trading signals
+• Configure signal preferences
+• Get notifications for your favorite instruments
+• Access premium analysis tools
+
+Start your subscription today!
+            """
+            
+            # Use direct URL link for subscription
+            checkout_url = "https://buy.stripe.com/3cs3eF9Hu9256NW9AA"
+            
+            # Create button for subscription
+            keyboard = [
+                [InlineKeyboardButton("🔔 Subscribe Now", url=checkout_url)],
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
+            ]
+            
+            await query.edit_message_text(
+                text=subscription_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.HTML
             )
-            return CHOOSE_ANALYSIS
-        except Exception as delete_error:
-            logger.warning(f"Could not delete message: {str(delete_error)}")
             
-            # Als verwijderen mislukt, probeer de media te updaten
-            try:
-                await query.edit_message_media(
-                    media=InputMediaAnimation(
-                        media=gif_url,
-                        caption="Select your analysis type:"
-                    ),
-                    reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD)
-                )
-                return CHOOSE_ANALYSIS
-            except Exception as media_error:
-                logger.warning(f"Could not update media: {str(media_error)}")
-                
-                # Als media update mislukt, probeer tekst te updaten
-                try:
-                    await query.edit_message_text(
-                        text="Select your analysis type:",
-                        reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
-                        parse_mode=ParseMode.HTML
-                    )
-                except Exception as text_error:
-                    # Als tekst updaten mislukt, probeer bijschrift te updaten
-                    if "There is no text in the message to edit" in str(text_error):
-                        try:
-                            await query.edit_message_caption(
-                                caption="Select your analysis type:",
-                                reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
-                                parse_mode=ParseMode.HTML
-                            )
-                        except Exception as caption_error:
-                            logger.error(f"Failed to update caption: {str(caption_error)}")
-                            # Laatste redmiddel: stuur een nieuw bericht
-                            await context.bot.send_animation(
-                                chat_id=update.effective_chat.id,
-                                animation=gif_url,
-                                caption="Select your analysis type:",
-                                reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
-                                parse_mode=ParseMode.HTML
-                            )
-                    else:
-                        logger.error(f"Failed to update message: {str(text_error)}")
-                        # Laatste redmiddel: stuur een nieuw bericht
-                        await context.bot.send_animation(
-                            chat_id=update.effective_chat.id,
-                            animation=gif_url,
-                            caption="Select your analysis type:",
-                            reply_markup=InlineKeyboardMarkup(ANALYSIS_KEYBOARD),
-                            parse_mode=ParseMode.HTML
-                        )
+            return MENU
+            
+        # For subscribed users, show signal options
+        keyboard = [
+            [InlineKeyboardButton("➕ Add Signals", callback_data="signals_add")],
+            [InlineKeyboardButton("⚙️ Manage Signals", callback_data="signals_manage")],
+            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
+        ]
         
-        return CHOOSE_ANALYSIS
-
+        await query.edit_message_text(
+            text="<b>Signal Management</b>\n\nManage your trading signal subscriptions:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML
+        )
+        
+        return SIGNAL_MANAGEMENT
+        
     async def show_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None, skip_gif=False) -> None:
         """Show the main menu when /menu command is used"""
         # Use context.bot if available, otherwise use self.bot
@@ -2755,11 +2770,14 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         try:
             # Extract signal information from callback data
             parts = query.data.split('_')
+            logger.info(f"Analyze callback parts: {parts}")
             
             # Format: analyze_from_signal_INSTRUMENT_SIGNALID
             if len(parts) >= 4:
                 instrument = parts[3]
                 signal_id = parts[4] if len(parts) >= 5 else None
+                
+                logger.info(f"Extracted instrument: {instrument}, signal_id: {signal_id}")
                 
                 # Store in context for other handlers
                 if context and hasattr(context, 'user_data'):
@@ -2794,43 +2812,63 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             context.user_data['signal_direction_backup'] = signal.get('direction')
                 
                 # Store the original signal page for later retrieval
-                await self._store_original_signal_page(update, context, instrument, signal_id)
+                logger.info(f"Storing original signal page for: {instrument}, {signal_id}")
+                try:
+                    await self._store_original_signal_page(update, context, instrument, signal_id)
+                    logger.info(f"Successfully stored original signal page")
+                except Exception as store_err:
+                    logger.error(f"Error storing original signal page: {str(store_err)}")
                 
                 # Show analysis options for this instrument
                 keyboard = [
-                    [InlineKeyboardButton("📈 Technical Analysis", callback_data=f"signal_flow_technical_{instrument}")],
-                    [InlineKeyboardButton("🧠 Market Sentiment", callback_data=f"signal_flow_sentiment_{instrument}")],
-                    [InlineKeyboardButton("📅 Economic Calendar", callback_data=f"signal_flow_calendar_{instrument}")],
-                    [InlineKeyboardButton("⬅️ Back to Signal", callback_data="back_to_signal")]
+                    [
+                        InlineKeyboardButton("📊 Technical", callback_data=f"analysis_technical_signal_{instrument}"),
+                        InlineKeyboardButton("🔍 Sentiment", callback_data=f"analysis_sentiment_signal_{instrument}")
+                    ],
+                    [
+                        InlineKeyboardButton("📅 Calendar", callback_data=f"analysis_calendar_signal_{instrument}"),
+                        InlineKeyboardButton("⬅️ Back to Signal", callback_data="back_to_signal")
+                    ]
                 ]
                 
-                # Update the message with the analysis options
+                # Add the back to menu button
+                keyboard.append([InlineKeyboardButton("🏠 Main Menu", callback_data="back_menu")])
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                # Ask the user what type of analysis they want
                 await query.edit_message_text(
-                    text=f"<b>🔍 Analyze {instrument}</b>\n\nSelect the type of analysis you want to perform:",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    text=f"<b>Choose Analysis for {instrument}</b>\n\nSelect the type of market analysis you'd like to see:",
+                    reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )
                 
-                return CHOOSE_ANALYSIS
+                logger.info(f"Displayed analysis options for {instrument}")
+                return ANALYSIS_OPTIONS
             else:
-                # Invalid callback data
+                logger.warning(f"Invalid callback data format: {query.data}")
+                # Fallback to instrument selection menu
                 await query.edit_message_text(
-                    text="Invalid signal format. Please try again from the main menu.",
-                    reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
+                    text="Sorry, there was an error processing that signal. Please select an instrument for analysis:",
+                    reply_markup=InlineKeyboardMarkup(MARKET_KEYBOARD),
+                    parse_mode=ParseMode.HTML
                 )
-                return MENU
+                return MARKET_SELECTION
+                
         except Exception as e:
             logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
-            logger.exception(e)
+            logger.exception(e)  # This logs the full traceback
             
-            # Error recovery
+            # Error recovery - show user a message and return to main menu
             try:
                 await query.edit_message_text(
-                    text="An error occurred. Please try again from the main menu.",
-                    reply_markup=InlineKeyboardMarkup(START_KEYBOARD)
+                    text="Sorry, there was an error while processing that signal. Please try again from the main menu.",
+                    reply_markup=InlineKeyboardMarkup(START_KEYBOARD),
+                    parse_mode=ParseMode.HTML
                 )
             except Exception:
                 pass
+            
             return MENU
 
     async def button_callback(self, update: Update, context=None) -> int:
@@ -4474,124 +4512,103 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             return SIGNALS
 
     async def signals_add_callback(self, update: Update, context=None) -> int:
-        """Handle signals_add button press to add new signal subscriptions"""
+        """Handle 'Add Signals' button from signal management menu"""
         query = update.callback_query
         await query.answer()
         
-        logger.info("signals_add_callback called")
+        # Show market selection menu for adding signals
+        keyboard = []
         
-        # Make sure we're in the signals flow context
-        if context and hasattr(context, 'user_data'):
-            context.user_data['is_signals_context'] = True
-            context.user_data['from_signal'] = False
-            
-            # Set flag for adding signals
-            context.user_data['adding_signals'] = True
-            
-            logger.info(f"Set signal flow context: {context.user_data}")
+        # First row - forex and crypto
+        keyboard.append([
+            InlineKeyboardButton("💱 Forex", callback_data="market_signals_forex"),
+            InlineKeyboardButton("₿ Crypto", callback_data="market_signals_crypto")
+        ])
         
-        # Create keyboard for market selection
-        keyboard = MARKET_KEYBOARD_SIGNALS
+        # Second row - indices and commodities
+        keyboard.append([
+            InlineKeyboardButton("📈 Indices", callback_data="market_signals_indices"),
+            InlineKeyboardButton("🛢️ Commodities", callback_data="market_signals_commodities")
+        ])
         
-        # Update message with market selection
-        await self.update_message(
-            query=query,
-            text="Select a market for trading signals:",
-            keyboard=InlineKeyboardMarkup(keyboard),
+        # Add back button
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_signals")])
+        
+        # Update the message with the market selection buttons
+        await query.edit_message_text(
+            text="<b>Add Signal Subscriptions</b>\n\nChoose the market for your signals:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.HTML
         )
         
-        return CHOOSE_MARKET
+        return SIGNAL_MARKET_SELECTION
         
     async def signals_manage_callback(self, update: Update, context=None) -> int:
-        """Handle signals_manage callback to manage signal preferences"""
+        """Handle 'Manage Signals' button from signal management menu"""
         query = update.callback_query
         await query.answer()
         
-        logger.info("signals_manage_callback called")
+        # Get user's current signal subscriptions
+        user_id = update.effective_user.id
+        preferences = await self.db.get_subscriber_preferences(user_id)
         
-        try:
-            # Get user's current subscriptions
-            user_id = update.effective_user.id
-            
-            # Fetch user's signal subscriptions from the database
-            try:
-                response = self.db.supabase.table('signal_subscriptions').select('*').eq('user_id', user_id).execute()
-                preferences = response.data if response and hasattr(response, 'data') else []
-            except Exception as db_error:
-                logger.error(f"Database error fetching signal subscriptions: {str(db_error)}")
-                preferences = []
-            
-            if not preferences:
-                # No subscriptions yet
-                text = "You don't have any signal subscriptions yet. Add some first!"
-                keyboard = [
-                    [InlineKeyboardButton("➕ Add Signal Pairs", callback_data="signals_add")],
-                    [InlineKeyboardButton("⬅️ Back", callback_data="back_signals")]
-                ]
-                
-                await self.update_message(
-                    query=query,
-                    text=text,
-                    keyboard=InlineKeyboardMarkup(keyboard),
-                    parse_mode=ParseMode.HTML
-                )
-                return CHOOSE_SIGNALS
-            
-            # Format current subscriptions
-            message = "<b>Your Signal Subscriptions:</b>\n\n"
-            
-            for i, pref in enumerate(preferences, 1):
-                market = pref.get('market', 'unknown')
-                instrument = pref.get('instrument', 'unknown')
-                timeframe = pref.get('timeframe', 'ALL')
-                
-                message += f"{i}. {market.upper()} - {instrument} ({timeframe})\n"
-            
-            # Add buttons to manage subscriptions
+        if not preferences:
+            # No subscriptions found
             keyboard = [
-                [InlineKeyboardButton("➕ Add More", callback_data="signals_add")],
-                [InlineKeyboardButton("🗑️ Remove All", callback_data="delete_all_signals")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="back_signals")]
-            ]
-            
-            # Add individual delete buttons if there are preferences
-            if preferences:
-                for i, pref in enumerate(preferences):
-                    signal_id = pref.get('id')
-                    if signal_id:
-                        instrument = pref.get('instrument', 'unknown')
-                        keyboard.insert(-1, [InlineKeyboardButton(f"❌ Delete {instrument}", callback_data=f"delete_signal_{signal_id}")])
-            
-            await self.update_message(
-                query=query,
-                text=message,
-                keyboard=InlineKeyboardMarkup(keyboard),
-                parse_mode=ParseMode.HTML
-            )
-            
-            return CHOOSE_SIGNALS
-            
-        except Exception as e:
-            logger.error(f"Error in signals_manage_callback: {str(e)}")
-            
-            # Error recovery - go back to signals menu
-            keyboard = [
-                [InlineKeyboardButton("📊 Add Signal", callback_data="signals_add")],
-                [InlineKeyboardButton("⚙️ Manage Signals", callback_data="signals_manage")],
+                [InlineKeyboardButton("➕ Add Signals", callback_data="signals_add")],
                 [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await self.update_message(
-                query=query,
-                text="<b>📈 Signal Management</b>\n\nManage your trading signals",
-                keyboard=reply_markup,
+            await query.edit_message_text(
+                text="<b>No Signal Subscriptions</b>\n\nYou don't have any signal subscriptions yet. Add some to get started!",
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.HTML
             )
             
-            return CHOOSE_SIGNALS
+            return SIGNAL_MANAGEMENT
+            
+        # Group preferences by market for better organization
+        market_groups = {}
+        for pref in preferences:
+            market = pref.get('market', 'Unknown')
+            if market not in market_groups:
+                market_groups[market] = []
+            market_groups[market].append(pref)
         
+        # Build message text
+        text = "<b>Your Signal Subscriptions</b>\n\n"
+        for market, prefs in market_groups.items():
+            market_emoji = {
+                'forex': '💱',
+                'crypto': '₿',
+                'indices': '📈',
+                'commodities': '🛢️'
+            }.get(market.lower(), '🔔')
+            
+            text += f"{market_emoji} <b>{market.title()}</b>\n"
+            for pref in prefs:
+                instrument = pref.get('instrument')
+                timeframe = pref.get('timeframe', 'ALL')
+                text += f"  • {instrument} ({timeframe})\n"
+            text += "\n"
+        
+        text += "Use the buttons below to manage your subscriptions."
+        
+        # Add buttons
+        keyboard = [
+            [InlineKeyboardButton("➕ Add More Signals", callback_data="signals_add")],
+            [InlineKeyboardButton("❌ Remove Signals", callback_data="signals_remove")],
+            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
+        ]
+        
+        await query.edit_message_text(
+            text=text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML
+        )
+        
+        return SIGNAL_MANAGEMENT
+
     async def back_instrument_callback(self, update: Update, context=None) -> int:
         """Handle back button to return to instrument selection"""
         query = update.callback_query
