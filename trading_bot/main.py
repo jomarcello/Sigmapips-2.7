@@ -1824,11 +1824,35 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_menu")])
         
         # Update the message with the market selection buttons
-        await query.edit_message_text(
-            text="<b>Select a Market</b>\n\nChoose the market you want to analyze:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode=ParseMode.HTML
-        )
+        try:
+            await query.edit_message_text(
+                text="<b>Select a Market</b>\n\nChoose the market you want to analyze:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.warning(f"Could not update message text: {str(e)}")
+            # If message has no text (likely a GIF/animation), try updating caption
+            if "There is no text in the message to edit" in str(e):
+                try:
+                    await query.edit_message_caption(
+                        caption="<b>Select a Market</b>\n\nChoose the market you want to analyze:",
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception as caption_error:
+                    logger.error(f"Failed to update caption: {str(caption_error)}")
+                    # Last resort: delete current message and send a new one
+                    try:
+                        await query.message.delete()
+                        await context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text="<b>Select a Market</b>\n\nChoose the market you want to analyze:",
+                            reply_markup=InlineKeyboardMarkup(keyboard),
+                            parse_mode=ParseMode.HTML
+                        )
+                    except Exception as delete_error:
+                        logger.error(f"Failed final fallback: {str(delete_error)}")
         
         return MARKET_SELECTION
         
@@ -1866,11 +1890,35 @@ Start your subscription today!
                 [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
             ]
             
-            await query.edit_message_text(
-                text=subscription_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode=ParseMode.HTML
-            )
+            try:
+                await query.edit_message_text(
+                    text=subscription_text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.HTML
+                )
+            except Exception as e:
+                logger.warning(f"Could not update message text: {str(e)}")
+                # If message has no text (likely a GIF/animation), try updating caption
+                if "There is no text in the message to edit" in str(e):
+                    try:
+                        await query.edit_message_caption(
+                            caption=subscription_text,
+                            reply_markup=InlineKeyboardMarkup(keyboard),
+                            parse_mode=ParseMode.HTML
+                        )
+                    except Exception as caption_error:
+                        logger.error(f"Failed to update caption: {str(caption_error)}")
+                        # Last resort: delete current message and send a new one
+                        try:
+                            await query.message.delete()
+                            await context.bot.send_message(
+                                chat_id=update.effective_chat.id,
+                                text=subscription_text,
+                                reply_markup=InlineKeyboardMarkup(keyboard),
+                                parse_mode=ParseMode.HTML
+                            )
+                        except Exception as delete_error:
+                            logger.error(f"Failed final fallback: {str(delete_error)}")
             
             return MENU
             
@@ -1881,11 +1929,35 @@ Start your subscription today!
             [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_menu")]
         ]
         
-        await query.edit_message_text(
-            text="<b>Signal Management</b>\n\nManage your trading signal subscriptions:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode=ParseMode.HTML
-        )
+        try:
+            await query.edit_message_text(
+                text="<b>Signal Management</b>\n\nManage your trading signal subscriptions:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.warning(f"Could not update message text: {str(e)}")
+            # If message has no text (likely a GIF/animation), try updating caption
+            if "There is no text in the message to edit" in str(e):
+                try:
+                    await query.edit_message_caption(
+                        caption="<b>Signal Management</b>\n\nManage your trading signal subscriptions:",
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception as caption_error:
+                    logger.error(f"Failed to update caption: {str(caption_error)}")
+                    # Last resort: delete current message and send a new one
+                    try:
+                        await query.message.delete()
+                        await context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text="<b>Signal Management</b>\n\nManage your trading signal subscriptions:",
+                            reply_markup=InlineKeyboardMarkup(keyboard),
+                            parse_mode=ParseMode.HTML
+                        )
+                    except Exception as delete_error:
+                        logger.error(f"Failed final fallback: {str(delete_error)}")
         
         return SIGNAL_MANAGEMENT
         
@@ -2132,6 +2204,26 @@ Start your subscription today!
         
         # Skip market selection and go directly to calendar analysis
         logger.info("Showing economic calendar without market selection")
+        
+        try:
+            # Try to update the message with a loading indicator before processing
+            await query.edit_message_text(
+                text="Loading economic calendar data...",
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.warning(f"Could not update message text: {str(e)}")
+            # If message has no text (likely a GIF/animation), try updating caption
+            if "There is no text in the message to edit" in str(e):
+                try:
+                    await query.edit_message_caption(
+                        caption="Loading economic calendar data...",
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception as caption_error:
+                    logger.error(f"Failed to update caption: {str(caption_error)}")
+                    # We'll continue anyway as show_calendar_analysis will handle the display
+        
         return await self.show_calendar_analysis(update, context)
 
     async def show_economic_calendar(self, update: Update, context: CallbackContext, currency=None, loading_message=None):
