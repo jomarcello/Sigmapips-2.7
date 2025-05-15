@@ -8,6 +8,8 @@ import logging
 import sys
 import re
 from pathlib import Path
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 
 # Set up logging
 logging.basicConfig(
@@ -76,6 +78,11 @@ def fix_analyze_market_button():
                     context.user_data['instrument'] = instrument
                     if signal_id:
                         context.user_data['signal_id'] = signal_id
+                    
+                    # Mark that we're coming from signal flow
+                    context.user_data['from_signal'] = True
+                    context.user_data['in_signal_flow'] = True
+                    logger.info("Set signal flow flags: from_signal=True, in_signal_flow=True")
                     
                     # Make a backup copy to ensure we can return to signal later
                     context.user_data['signal_instrument_backup'] = instrument
