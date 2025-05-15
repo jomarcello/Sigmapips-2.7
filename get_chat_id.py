@@ -4,6 +4,7 @@ Simple script to get the chat ID of users who message the bot
 """
 
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
@@ -47,20 +48,7 @@ async def main() -> None:
 
     # Start the Bot
     logger.info("Bot started. Send a message to get your chat ID.")
-    
-    # Gebruik de aanbevolen methode om de bot te starten
-    await application.initialize()
-    await application.updater.start_polling()
+    await application.run_polling()
 
 if __name__ == '__main__':
-    import asyncio
-    try:
-        # Gebruik een nieuw event loop patroon dat beter omgaat met fouten
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(main())
-        loop.run_forever()
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user.")
-    except Exception as e:
-        logger.error(f"Error running bot: {e}") 
+    asyncio.run(main()) 
