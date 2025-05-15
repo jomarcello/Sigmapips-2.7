@@ -8,8 +8,6 @@ import stripe
 import datetime
 from datetime import timezone
 import traceback
-import time
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -19,30 +17,7 @@ class Database:
         # Get environment variables
         self.supabase_url = os.getenv("SUPABASE_URL")
         self.supabase_key = os.getenv("SUPABASE_KEY")
-        
-        # Handle Redis URL with proper fallbacks
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        
-        # Check if the Redis URL contains Railway placeholders (${{}})
-        if "${" in redis_url:
-            logger.warning(f"Redis URL contains unresolved placeholders: {redis_url}")
-            
-            # Try to construct a valid Redis URL from individual components
-            redis_password = os.getenv("REDIS_PASSWORD")
-            redis_host = os.getenv("REDISHOST", "localhost")
-            redis_port = os.getenv("REDISPORT", "6379")
-            redis_user = os.getenv("REDISUSER", "default")
-            
-            # If we have all required components, construct the URL
-            if redis_password:
-                redis_url = f"redis://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
-                logger.info(f"Constructed Redis URL from components: {redis_url.replace(redis_password, '****')}")
-            else:
-                # Fall back to localhost for local development
-                redis_url = "redis://localhost:6379"
-                logger.info(f"Falling back to local Redis URL: {redis_url}")
-        
-        self.redis_url = redis_url
+        self.redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
         
         # Local caching
         self.cache = {}
@@ -83,48 +58,13 @@ class Database:
                 
             # Initialize Redis connection for caching if available
             try:
-                # Try to connect to Redis with a short timeout
-                self.redis = redis.from_url(self.redis_url, decode_responses=True, socket_timeout=5.0)
+                self.redis = redis.from_url(self.redis_url, decode_responses=True)
                 self.redis.ping()  # Test connection
                 self.using_redis = True
                 logger.info("Successfully connected to Redis")
-                
-                # Store a test key to verify write access
-                test_key = "test:connection"
-                test_value = f"connected_at_{datetime.datetime.now().isoformat()}"
-                self.redis.set(test_key, test_value, ex=60)  # Expire in 60 seconds
-                retrieved_value = self.redis.get(test_key)
-                
-                if retrieved_value == test_value:
-                    logger.info("Redis write/read test successful")
-                else:
-                    logger.warning(f"Redis write/read test failed. Expected: {test_value}, Got: {retrieved_value}")
-                    
             except Exception as e:
-                # If connection fails, try localhost as a fallback for local development
-                logger.warning(f"Redis connection failed: {str(e)}. Trying localhost fallback.")
-                try:
-                    local_redis_url = "redis://localhost:6379"
-                    self.redis = redis.from_url(local_redis_url, decode_responses=True, socket_timeout=5.0)
-                    self.redis.ping()  # Test connection
-                    self.using_redis = True
-                    self.redis_url = local_redis_url
-                    logger.info("Successfully connected to Redis using localhost fallback")
-                    
-                    # Store a test key to verify write access
-                    test_key = "test:connection"
-                    test_value = f"connected_at_{datetime.datetime.now().isoformat()}"
-                    self.redis.set(test_key, test_value, ex=60)  # Expire in 60 seconds
-                    retrieved_value = self.redis.get(test_key)
-                    
-                    if retrieved_value == test_value:
-                        logger.info("Redis write/read test successful")
-                    else:
-                        logger.warning(f"Redis write/read test failed. Expected: {test_value}, Got: {retrieved_value}")
-                        
-                except Exception as local_e:
-                    logger.warning(f"Local Redis connection also failed: {str(local_e)}. Using local caching.")
-                    self.redis = None
+                logger.warning(f"Redis connection failed: {str(e)}. Using local caching.")
+                self.redis = None
                 
             # Setup mock data if needed
             if self.use_mock_data:
@@ -146,9 +86,6 @@ class Database:
             'intraday': '1h',
             'swing': '4h'
         }
-        
-        # Initialize signal storage
-        self.signal_cache = {}
         
     def _setup_mock_data(self):
         """Set up mock data for development and testing"""
@@ -732,114 +669,41 @@ class Database:
         logger.warning(f"Could not map timeframe '{timeframe}' to a style, defaulting to 'intraday'")
         return 'intraday'
 
-    async def execute_query(self, query: str, params=None) -> List[Dict[str, Any]]:
+    async def execute_query(self, query: str) -> List[Dict[str, Any]]:
         """Execute a query on Supabase (simplified version)"""
         try:
             logger.info(f"Executing query: {query}")
             
-            if params:
-                logger.info(f"With parameters: {params}")
-            
             # Eenvoudige implementatie: haal alle subscriber_preferences op en filter handmatig
-            if "SELECT * FROM signals" in query:
-                # Handle signals queries differently
-                if "WHERE id =" in query and params and len(params) >= 2:
-                    signal_id = params[0]
-                    user_id = params[1]
-                    
-                    # Check Redis first
-                    if self.using_redis:
-                        try:
-                            key = f"signal:{user_id}:{signal_id}"
-                            signal_json = self.redis.get(key)
-                            if signal_json:
-                                logger.info(f"Retrieved signal from Redis: {signal_id}")
-                                return [json.loads(signal_json)]
-                        except Exception as redis_error:
-                            logger.error(f"Redis error: {str(redis_error)}")
-                    
-                    # Fall back to Supabase
-                    try:
-                        if hasattr(self, 'supabase') and self.supabase:
-                            # This is a simplified implementation
-                            # In a real system, you would use proper SQL queries
-                            logger.info(f"Querying signals table for id={signal_id}, user_id={user_id}")
-                            return []  # Return empty for now as we don't have a real implementation
-                    except Exception as supabase_error:
-                        logger.error(f"Supabase error: {str(supabase_error)}")
-                        
-                    return []
-                
-                elif "WHERE user_id =" in query and params and len(params) >= 1:
-                    user_id = params[0]
-                    instrument = None
-                    
-                    # Check if we're filtering by instrument
-                    if len(params) >= 2 and "AND instrument =" in query:
-                        instrument = params[1]
-                    
-                    # Check Redis for matching keys
-                    if self.using_redis:
-                        try:
-                            pattern = f"signal:{user_id}:*"
-                            keys = self.redis.keys(pattern)
-                            results = []
-                            
-                            for key in keys:
-                                signal_json = self.redis.get(key)
-                                if signal_json:
-                                    signal_data = json.loads(signal_json)
-                                    if instrument is None or signal_data.get('instrument') == instrument:
-                                        results.append(signal_data)
-                            
-                            # Sort by timestamp, newest first
-                            if results:
-                                results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-                                
-                            logger.info(f"Retrieved {len(results)} signals from Redis for user {user_id}")
-                            return results
-                        except Exception as redis_error:
-                            logger.error(f"Redis error: {str(redis_error)}")
-                    
-                    return []
-                
-                # Default implementation for other signals queries
-                return []
+            result = self.supabase.table('subscriber_preferences').select('*').execute()
             
-            # Default implementation for other tables
-            if hasattr(self, 'supabase') and self.supabase:
-                result = self.supabase.table('subscriber_preferences').select('*').execute()
+            # Log het resultaat
+            logger.info(f"Raw query result: {result.data}")
+            
+            # Als de query een filter op market, instrument en timeframe bevat, filter dan handmatig
+            if 'market' in query and 'instrument' in query and 'timeframe' in query:
+                # Extraheer de waarden (eenvoudige implementatie)
+                market_match = re.search(r"market\s*=\s*'([^']*)'", query)
+                instrument_match = re.search(r"instrument\s*=\s*'([^']*)'", query)
+                timeframe_match = re.search(r"timeframe\s*=\s*'([^']*)'", query)
                 
-                # Log het resultaat
-                logger.info(f"Raw query result: {result.data}")
-                
-                # Als de query een filter op market, instrument en timeframe bevat, filter dan handmatig
-                if 'market' in query and 'instrument' in query and 'timeframe' in query:
-                    # Extraheer de waarden (eenvoudige implementatie)
-                    market_match = re.search(r"market\s*=\s*'([^']*)'", query)
-                    instrument_match = re.search(r"instrument\s*=\s*'([^']*)'", query)
-                    timeframe_match = re.search(r"timeframe\s*=\s*'([^']*)'", query)
+                if market_match and instrument_match and timeframe_match:
+                    market = market_match.group(1)
+                    instrument = instrument_match.group(1)
+                    timeframe = timeframe_match.group(1)
                     
-                    if market_match and instrument_match and timeframe_match:
-                        market = market_match.group(1)
-                        instrument = instrument_match.group(1)
-                        timeframe = timeframe_match.group(1)
-                        
-                        # Filter handmatig
-                        filtered_result = [
-                            item for item in result.data
-                            if item.get('market') == market and 
-                               item.get('instrument') == instrument and 
-                               item.get('timeframe') == timeframe
-                        ]
-                        
-                        logger.info(f"Filtered result: {filtered_result}")
-                        return filtered_result
-                
-                return result.data
-            else:
-                logger.warning("Supabase client not available")
-                return []
+                    # Filter handmatig
+                    filtered_result = [
+                        item for item in result.data
+                        if item.get('market') == market and 
+                           item.get('instrument') == instrument and 
+                           item.get('timeframe') == timeframe
+                    ]
+                    
+                    logger.info(f"Filtered result: {filtered_result}")
+                    return filtered_result
+            
+            return result.data
         except Exception as e:
             logger.error(f"Error executing query: {str(e)}")
             logger.exception(e)
@@ -1386,434 +1250,3 @@ class Database:
             logging.error(f"Error checking bot instance: {e}")
             # Default to active in case of error
             return False, True
-
-    async def store_signal(self, user_id: int, signal_data: dict) -> bool:
-        """
-        Store a signal in the database for persistent access
-        
-        Arguments:
-            user_id: Telegram user ID
-            signal_data: Signal data dictionary
-            
-        Returns:
-            bool: Success indicator
-        """
-        try:
-            # Generate a signal ID if not present
-            if 'id' not in signal_data:
-                instrument = signal_data.get('instrument', 'unknown')
-                direction = signal_data.get('direction', 'unknown')
-                timeframe = signal_data.get('timeframe', '1h')
-                timestamp = int(time.time())
-                signal_data['id'] = f"{instrument}_{direction}_{timeframe}_{timestamp}"
-            
-            # Ensure timestamp is present
-            if 'timestamp' not in signal_data:
-                signal_data['timestamp'] = datetime.datetime.now().isoformat()
-            
-            # Add user ID to signal data
-            signal_data['user_id'] = user_id
-            
-            if self.use_mock_data:
-                # Store in memory for mock mode
-                if not hasattr(self, 'mock_signals'):
-                    self.mock_signals = {}
-                
-                user_str_id = str(user_id)
-                if user_str_id not in self.mock_signals:
-                    self.mock_signals[user_str_id] = {}
-                
-                self.mock_signals[user_str_id][signal_data['id']] = signal_data
-                logger.info(f"Stored signal in mock database: {signal_data['id']}")
-                return True
-            
-            # Store in Supabase if available
-            if hasattr(self, 'supabase') and self.supabase:
-                try:
-                    # Insert signal data into the signals table
-                    response = self.supabase.table('signals').insert(signal_data).execute()
-                    if response and hasattr(response, 'data') and response.data:
-                        logger.info(f"Stored signal in Supabase: {signal_data['id']}")
-                        # Also store in Redis for faster access
-                        if self.using_redis:
-                            key = f"signal:{user_id}:{signal_data['id']}"
-                            self.redis.setex(key, 30 * 24 * 60 * 60, json.dumps(signal_data))
-                        return True
-                except Exception as e:
-                    logger.error(f"Error storing signal in Supabase: {str(e)}")
-                    # Fall back to Redis or memory cache
-            
-            # Store in Redis if available
-            if self.using_redis:
-                try:
-                    # Store signal in Redis with expiration (30 days)
-                    key = f"signal:{user_id}:{signal_data['id']}"
-                    self.redis.setex(key, 30 * 24 * 60 * 60, json.dumps(signal_data))
-                    logger.info(f"Stored signal in Redis: {signal_data['id']}")
-                    return True
-                except Exception as e:
-                    logger.error(f"Error storing signal in Redis: {str(e)}")
-                    # Fall back to memory cache
-            
-            # Store in memory cache as last resort
-            if not hasattr(self, 'signal_cache'):
-                self.signal_cache = {}
-            
-            user_str_id = str(user_id)
-            if user_str_id not in self.signal_cache:
-                self.signal_cache[user_str_id] = {}
-            
-            self.signal_cache[user_str_id][signal_data['id']] = signal_data
-            logger.info(f"Stored signal in memory cache: {signal_data['id']}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in store_signal: {str(e)}")
-            return False
-    
-    async def get_signal(self, user_id: int, signal_id: str) -> dict:
-        """
-        Get a specific signal from the database
-        
-        Arguments:
-            user_id: Telegram user ID
-            signal_id: Signal ID
-            
-        Returns:
-            dict: Signal data or None if not found
-        """
-        try:
-            # Check mock data first
-            if self.use_mock_data and hasattr(self, 'mock_signals'):
-                user_str_id = str(user_id)
-                if user_str_id in self.mock_signals and signal_id in self.mock_signals[user_str_id]:
-                    return self.mock_signals[user_str_id][signal_id]
-            
-            # Check Supabase if available
-            if hasattr(self, 'supabase') and self.supabase:
-                try:
-                    result = await self.execute_query(
-                        "SELECT * FROM signals WHERE id = %s AND user_id = %s",
-                        [signal_id, user_id]
-                    )
-                    
-                    if result and len(result) > 0:
-                        logger.info(f"Retrieved signal from database: {signal_id}")
-                        return result[0]
-                except Exception as e:
-                    logger.error(f"Error retrieving signal from database: {str(e)}")
-                    # Fall back to Redis or memory cache
-            
-            # Check Redis if available
-            if self.using_redis:
-                try:
-                    key = f"signal:{user_id}:{signal_id}"
-                    signal_json = self.redis.get(key)
-                    if signal_json:
-                        logger.info(f"Retrieved signal from Redis: {signal_id}")
-                        return json.loads(signal_json)
-                except Exception as e:
-                    logger.error(f"Error retrieving signal from Redis: {str(e)}")
-                    # Fall back to memory cache
-            
-            # Check memory cache as last resort
-            if hasattr(self, 'signal_cache'):
-                user_str_id = str(user_id)
-                if user_str_id in self.signal_cache and signal_id in self.signal_cache[user_str_id]:
-                    logger.info(f"Retrieved signal from memory cache: {signal_id}")
-                    return self.signal_cache[user_str_id][signal_id]
-            
-            logger.warning(f"Signal not found: {signal_id} for user {user_id}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error in get_signal: {str(e)}")
-            return None
-    
-    async def get_user_signals(self, user_id: int, instrument: str = None) -> list:
-        """
-        Get all signals for a user, optionally filtered by instrument
-        
-        Arguments:
-            user_id: Telegram user ID
-            instrument: Optional instrument filter
-            
-        Returns:
-            list: List of signal data dictionaries
-        """
-        try:
-            signals = []
-            
-            # Check mock data first
-            if self.use_mock_data and hasattr(self, 'mock_signals'):
-                user_str_id = str(user_id)
-                if user_str_id in self.mock_signals:
-                    for signal_id, signal_data in self.mock_signals[user_str_id].items():
-                        if instrument is None or signal_data.get('instrument') == instrument:
-                            signals.append(signal_data)
-            
-            # Check Supabase if available
-            elif hasattr(self, 'supabase') and self.supabase:
-                try:
-                    if instrument:
-                        result = await self.execute_query(
-                            "SELECT * FROM signals WHERE user_id = %s AND instrument = %s ORDER BY timestamp DESC",
-                            [user_id, instrument]
-                        )
-                    else:
-                        result = await self.execute_query(
-                            "SELECT * FROM signals WHERE user_id = %s ORDER BY timestamp DESC",
-                            [user_id]
-                        )
-                    
-                    if result and len(result) > 0:
-                        logger.info(f"Retrieved {len(result)} signals from database for user {user_id}")
-                        signals = result
-                except Exception as e:
-                    logger.error(f"Error retrieving signals from database: {str(e)}")
-                    # Fall back to Redis or memory cache
-            
-            # Check Redis if available and no signals found yet
-            elif self.using_redis and not signals:
-                try:
-                    # Get all keys matching the pattern
-                    pattern = f"signal:{user_id}:*"
-                    keys = self.redis.keys(pattern)
-                    
-                    for key in keys:
-                        signal_json = self.redis.get(key)
-                        if signal_json:
-                            signal_data = json.loads(signal_json)
-                            if instrument is None or signal_data.get('instrument') == instrument:
-                                signals.append(signal_data)
-                    
-                    logger.info(f"Retrieved {len(signals)} signals from Redis for user {user_id}")
-                except Exception as e:
-                    logger.error(f"Error retrieving signals from Redis: {str(e)}")
-                    # Fall back to memory cache
-            
-            # Check memory cache as last resort
-            elif hasattr(self, 'signal_cache') and not signals:
-                user_str_id = str(user_id)
-                if user_str_id in self.signal_cache:
-                    for signal_id, signal_data in self.signal_cache[user_str_id].items():
-                        if instrument is None or signal_data.get('instrument') == instrument:
-                            signals.append(signal_data)
-                    
-                    logger.info(f"Retrieved {len(signals)} signals from memory cache for user {user_id}")
-            
-            # Sort signals by timestamp, newest first
-            if signals:
-                try:
-                    # Define a safe sorting key function that handles different timestamp formats
-                    def get_timestamp_key(signal):
-                        timestamp = signal.get('timestamp', '')
-                        if isinstance(timestamp, (int, float)):
-                            return float(timestamp)
-                        elif isinstance(timestamp, str):
-                            # Try to parse ISO format timestamp
-                            try:
-                                # Remove timezone info if present
-                                if timestamp.endswith('Z'):
-                                    timestamp = timestamp[:-1]
-                                if '+' in timestamp:
-                                    timestamp = timestamp.split('+')[0]
-                                
-                                # Parse the timestamp
-                                dt = datetime.datetime.fromisoformat(timestamp)
-                                return dt.timestamp()
-                            except (ValueError, TypeError):
-                                # If parsing fails, return a default old timestamp
-                                return 0
-                        return 0  # Default for any other case
-                    
-                    signals.sort(key=get_timestamp_key, reverse=True)
-                    logger.info("Signals sorted by timestamp")
-                except Exception as sort_error:
-                    logger.error(f"Error sorting signals: {str(sort_error)}")
-            
-            return signals
-            
-        except Exception as e:
-            logger.error(f"Error in get_user_signals: {str(e)}")
-            return []
-    
-    async def get_active_signals(self) -> list:
-        """
-        Get all active signals from the database
-        
-        Returns:
-            list: List of signal data dictionaries
-        """
-        try:
-            signals = []
-            
-            # Check mock data first
-            if self.use_mock_data and hasattr(self, 'mock_signals'):
-                for user_id, user_signals in self.mock_signals.items():
-                    for signal_id, signal_data in user_signals.items():
-                        signals.append(signal_data)
-            
-            # Check Supabase if available
-            elif hasattr(self, 'supabase') and self.supabase:
-                try:
-                    # Get signals from the last 7 days
-                    result = await self.execute_query(
-                        "SELECT * FROM signals WHERE timestamp > NOW() - INTERVAL '7 days' ORDER BY timestamp DESC",
-                        []  # Empty params array to match the new execute_query signature
-                    )
-                    
-                    if result and len(result) > 0:
-                        logger.info(f"Retrieved {len(result)} active signals from database")
-                        signals = result
-                except Exception as e:
-                    logger.error(f"Error retrieving active signals from database: {str(e)}")
-                    # Fall back to Redis or memory cache
-            
-            # Check Redis if available and no signals found yet
-            elif self.using_redis and not signals:
-                try:
-                    # Get all keys matching the pattern
-                    pattern = "signal:*"
-                    keys = self.redis.keys(pattern)
-                    
-                    for key in keys:
-                        signal_json = self.redis.get(key)
-                        if signal_json:
-                            signals.append(json.loads(signal_json))
-                    
-                    logger.info(f"Retrieved {len(signals)} active signals from Redis")
-                except Exception as e:
-                    logger.error(f"Error retrieving active signals from Redis: {str(e)}")
-                    # Fall back to memory cache
-            
-            # Check memory cache as last resort
-            elif hasattr(self, 'signal_cache') and not signals:
-                for user_id, user_signals in self.signal_cache.items():
-                    for signal_id, signal_data in user_signals.items():
-                        signals.append(signal_data)
-                
-                logger.info(f"Retrieved {len(signals)} active signals from memory cache")
-            
-            # Sort signals by timestamp, newest first
-            if signals:
-                try:
-                    # Define a safe sorting key function that handles different timestamp formats
-                    def get_timestamp_key(signal):
-                        timestamp = signal.get('timestamp', '')
-                        if isinstance(timestamp, (int, float)):
-                            return float(timestamp)
-                        elif isinstance(timestamp, str):
-                            # Try to parse ISO format timestamp
-                            try:
-                                # Remove timezone info if present
-                                if timestamp.endswith('Z'):
-                                    timestamp = timestamp[:-1]
-                                if '+' in timestamp:
-                                    timestamp = timestamp.split('+')[0]
-                                
-                                # Parse the timestamp
-                                dt = datetime.datetime.fromisoformat(timestamp)
-                                return dt.timestamp()
-                            except (ValueError, TypeError):
-                                # If parsing fails, return a default old timestamp
-                                return 0
-                        return 0  # Default for any other case
-                    
-                    signals.sort(key=get_timestamp_key, reverse=True)
-                    logger.info("Active signals sorted by timestamp")
-                except Exception as sort_error:
-                    logger.error(f"Error sorting active signals: {str(sort_error)}")
-            
-            return signals
-            
-        except Exception as e:
-            logger.error(f"Error in get_active_signals: {str(e)}")
-            return []
-
-    async def save_signal_page(self, user_id: int, instrument: str, signal_page_data: dict) -> bool:
-        """
-        Store signal page data for later retrieval when returning from analysis
-        
-        Arguments:
-            user_id: Telegram user ID
-            instrument: Trading instrument
-            signal_page_data: Signal page data dictionary
-            
-        Returns:
-            bool: Success indicator
-        """
-        try:
-            # Ensure required fields are present
-            if not all(k in signal_page_data for k in ['instrument', 'signal_id', 'message']):
-                logger.warning(f"Missing required fields in signal page data: {signal_page_data}")
-                return False
-                
-            # Generate a key for the signal page
-            page_key = f"signal_page:{user_id}:{instrument}"
-            
-            # Store signal page data in Redis if available
-            if self.using_redis:
-                try:
-                    self.redis.setex(page_key, 24 * 60 * 60, json.dumps(signal_page_data))  # 24 hour expiry
-                    logger.info(f"Signal page data stored in Redis: {page_key}")
-                    return True
-                except Exception as e:
-                    logger.error(f"Error storing signal page in Redis: {str(e)}")
-                    # Fall back to memory cache
-            
-            # Store in memory cache
-            if not hasattr(self, 'signal_page_cache'):
-                self.signal_page_cache = {}
-                
-            user_str_id = str(user_id)
-            if user_str_id not in self.signal_page_cache:
-                self.signal_page_cache[user_str_id] = {}
-                
-            self.signal_page_cache[user_str_id][instrument] = signal_page_data
-            logger.info(f"Signal page data stored in memory cache: {page_key}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error saving signal page: {str(e)}")
-            return False
-            
-    async def get_signal_page(self, user_id: int, instrument: str) -> dict:
-        """
-        Retrieve signal page data
-        
-        Arguments:
-            user_id: Telegram user ID
-            instrument: Trading instrument
-            
-        Returns:
-            dict: Signal page data or None if not found
-        """
-        try:
-            # Generate a key for the signal page
-            page_key = f"signal_page:{user_id}:{instrument}"
-            
-            # Check Redis first if available
-            if self.using_redis:
-                try:
-                    signal_page_json = self.redis.get(page_key)
-                    if signal_page_json:
-                        logger.info(f"Retrieved signal page from Redis: {page_key}")
-                        return json.loads(signal_page_json)
-                except Exception as e:
-                    logger.error(f"Error retrieving signal page from Redis: {str(e)}")
-                    # Fall back to memory cache
-            
-            # Check memory cache
-            if hasattr(self, 'signal_page_cache'):
-                user_str_id = str(user_id)
-                if user_str_id in self.signal_page_cache and instrument in self.signal_page_cache[user_str_id]:
-                    logger.info(f"Retrieved signal page from memory cache: {page_key}")
-                    return self.signal_page_cache[user_str_id][instrument]
-            
-            logger.warning(f"Signal page not found: {page_key}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error retrieving signal page: {str(e)}")
-            return None
