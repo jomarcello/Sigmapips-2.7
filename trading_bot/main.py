@@ -2817,14 +2817,18 @@ Start your subscription today!
             except Exception as store_err:
                 logger.error(f"Error storing original signal page: {str(store_err)}")
             
-            # Show analysis options for this instrument
-            # Use the SIGNAL_ANALYSIS_KEYBOARD for consistency
-            keyboard = SIGNAL_ANALYSIS_KEYBOARD
+            # Show analysis options for this instrument with specific signal flow callbacks
+            keyboard = [
+                [InlineKeyboardButton("📈 Technical Analysis", callback_data=f"signal_technical_{instrument}")],
+                [InlineKeyboardButton("🧠 Market Sentiment", callback_data=f"signal_sentiment_{instrument}")],
+                [InlineKeyboardButton("📅 Economic Calendar", callback_data=f"signal_calendar_{instrument}")],
+                [InlineKeyboardButton("⬅️ Back to Signal", callback_data="back_to_signal")]
+            ]
             
             # Try to edit the message text
             try:
                 await query.edit_message_text(
-                    text=f"Select your analysis type:",
+                    text=f"<b>🔍 Analyze {instrument}</b>\n\nSelect the type of analysis you want to perform:",
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
@@ -2832,7 +2836,7 @@ Start your subscription today!
                 logger.error(f"Error in analyze_from_signal_callback: {str(e)}")
                 # Fall back to sending a new message
                 await query.message.reply_text(
-                    text=f"Select your analysis type:",
+                    text=f"<b>🔍 Analyze {instrument}</b>\n\nSelect the type of analysis you want to perform:",
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode=ParseMode.HTML
                 )
@@ -2869,6 +2873,33 @@ Start your subscription today!
             # Handle analyze from signal button
             if callback_data.startswith("analyze_from_signal_"):
                 return await self.analyze_from_signal_callback(update, context)
+            
+            # Handle signal_technical with instrument parameter
+            if callback_data.startswith("signal_technical_"):
+                parts = callback_data.split('_')
+                if len(parts) >= 3:
+                    instrument = parts[2]
+                    if context and hasattr(context, 'user_data'):
+                        context.user_data['instrument'] = instrument
+                    return await self.signal_technical_callback(update, context)
+            
+            # Handle signal_sentiment with instrument parameter
+            if callback_data.startswith("signal_sentiment_"):
+                parts = callback_data.split('_')
+                if len(parts) >= 3:
+                    instrument = parts[2]
+                    if context and hasattr(context, 'user_data'):
+                        context.user_data['instrument'] = instrument
+                    return await self.signal_sentiment_callback(update, context)
+            
+            # Handle signal_calendar with instrument parameter (already implemented)
+            if callback_data.startswith("signal_calendar_"):
+                parts = callback_data.split('_')
+                if len(parts) >= 3:
+                    instrument = parts[2]
+                    if context and hasattr(context, 'user_data'):
+                        context.user_data['instrument'] = instrument
+                    return await self.signal_calendar_callback(update, context)
                 
             # Help button
             if callback_data == "help":
@@ -4779,3 +4810,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Error in main function: {str(e)}")
         logger.exception(e)
+                
