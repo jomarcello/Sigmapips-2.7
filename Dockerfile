@@ -88,11 +88,10 @@ if [ -n "$BOT_TOKEN" ]; then\n\
   sleep 2\n\
 fi\n\
 \n\
-# Start the FastAPI server in the background\n\
-python -m trading_bot.server & \n\
-\n\
-# Start the Telegram bot in the foreground\n\
-python -m trading_bot.main\n\
+# Start the combined FastAPI and Telegram bot application\n\
+# We use a single process instead of two separate ones to avoid conflicts\n\
+echo "Starting bot in unified mode..."\n\
+python -m trading_bot.unified_app\n\
 ' > /app/start.sh
 
 RUN chmod +x /app/start.sh

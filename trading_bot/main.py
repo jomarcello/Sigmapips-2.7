@@ -5188,18 +5188,13 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 # If we made it this far, set the bot_started flag
                 self.bot_started = True
                 
-                # Run the bot until it receives a stop signal
+                # Start polling in non-blocking mode
                 await self.application.updater.start_polling(drop_pending_updates=True)
                 logger.info("Bot polling started")
                 
-                # Run until stopped - Use proper waiting mechanism instead of idle()
-                # Create a simple infinite loop to keep the application running
-                stop_signal = asyncio.Event()
-                try:
-                    await stop_signal.wait()
-                except asyncio.CancelledError:
-                    pass
-                logger.info("Bot stopped")
+                # Do NOT create a loop here, let calling code handle this
+                # Instead, return so the caller can manage the bot lifecycle
+                return
                 
             else:
                 logger.error("Application not properly initialized")
