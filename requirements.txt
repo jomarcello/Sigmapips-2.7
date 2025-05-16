@@ -10,6 +10,7 @@ psutil>=5.9.0    # For system monitoring
 fastapi>=0.95.0
 uvicorn[standard]>=0.21.1
 openai>=1.35.0  # Specific version known to support AsyncOpenAI and o4-mini model
+aiofiles>=23.1.0  # Async file operations for signal storage
 
 # Database
 supabase==1.1.1
