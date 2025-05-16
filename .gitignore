@@ -103,7 +103,15 @@ ENV/
 
 # Test signals
 test_signals/
-data/
+# Allow data directory structure but ignore signal files
+data/*
+!data/.keep
+!data/signals/
+data/signals/*
+!data/signals/.keep
+!data/signals/users/
+data/signals/users/*
+!data/signals/users/.keep
 
 # Backup files
 *.bak
