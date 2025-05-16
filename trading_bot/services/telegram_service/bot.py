@@ -1323,6 +1323,7 @@ class TelegramService:
                 'signal_id',
                 'from_signal',
                 'in_signal_flow',
+                'is_signals_context', # <<< ADDED THIS KEY
                 'signal_instrument_backup',
                 'signal_id_backup',
                 'signal_direction',
@@ -1375,6 +1376,7 @@ class TelegramService:
                 'signal_id',
                 'from_signal',
                 'in_signal_flow',
+                'is_signals_context', # <<< ADDED THIS KEY
                 'signal_instrument_backup',
                 'signal_id_backup',
                 'signal_direction',
