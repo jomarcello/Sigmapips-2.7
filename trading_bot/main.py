@@ -716,6 +716,12 @@ class TelegramService:
         self.stripe_service = stripe_service
         self.user_signals = {}
         self.signals_dir = "data/signals"
+        self.user_signals_dir = "data/signals/users"
+
+        # Create necessary directories
+        os.makedirs(self.signals_dir, exist_ok=True)
+        os.makedirs(self.user_signals_dir, exist_ok=True)
+
         self.signals_enabled_val = True
         self.polling_started = False
         self.admin_users = [1093307376]  # Add your Telegram ID here for testing
@@ -1239,6 +1245,9 @@ class TelegramService:
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
+                        
+                        # IMPROVED: Save user-specific signal
+                        self._save_user_signal(admin_str_id, signal_id, normalized_data)
                 except Exception as e:
                     logger.error(f"Error sending test signal to admin: {str(e)}")
             
@@ -1280,6 +1289,9 @@ class TelegramService:
                         self.user_signals[user_str_id] = {}
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
+                    
+                    # IMPROVED: Save user-specific signal
+                    self._save_user_signal(user_str_id, signal_id, normalized_data)
                     
                 except Exception as e:
                     logger.error(f"Error sending signal to user {user_id}: {str(e)}")
@@ -1345,7 +1357,24 @@ class TelegramService:
             
             return message
             
+        
+    def _save_user_signal(self, user_id: str, signal_id: str, signal_data: Dict[str, Any]) -> None:
+        # Save a signal specifically for a user to ensure persistence
+        try:
+            # Create user's signal directory if it doesn't exist
+            user_signal_dir = os.path.join(self.user_signals_dir, user_id)
+            os.makedirs(user_signal_dir, exist_ok=True)
+            
+            # Save the signal data to the user's directory
+            signal_path = os.path.join(user_signal_dir, f"{signal_id}.json")
+            with open(signal_path, 'w') as f:
+                json.dump(signal_data, f)
+                
+            logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
+            logger.error(f"Error saving user signal: {str(e)}")
+    
+    except Exception as e:
             logger.error(f"Error formatting signal message: {str(e)}")
             # Return simple message on error
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
@@ -2630,16 +2659,63 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     if signal_id:
                         context.user_data['signal_id_backup'] = signal_id
                     
-                    # Also store info from the actual signal if available
-                    if str(update.effective_user.id) in self.user_signals and signal_id in self.user_signals[str(update.effective_user.id)]:
-                        signal = self.user_signals[str(update.effective_user.id)][signal_id]
-                        if signal:
-                            context.user_data['signal_direction'] = signal.get('direction')
-                            context.user_data['signal_timeframe'] = signal.get('interval')
-                            # Backup copies
-                            context.user_data['signal_direction_backup'] = signal.get('direction')
-                            context.user_data['signal_timeframe_backup'] = signal.get('interval')
-                            logger.info(f"Stored signal details: direction={signal.get('direction')}, timeframe={signal.get('interval')}")
+                    # Try to find signal data for additional context
+                    # First try user-specific signals
+                    user_id = str(update.effective_user.id)
+                    signal_found = False
+                    signal_data = None
+                    
+                    # Look in user signals memory cache
+                    if user_id in self.user_signals and signal_id in self.user_signals[user_id]:
+                        signal_data = self.user_signals[user_id][signal_id]
+                        signal_found = True
+                        logger.info(f"Found signal {signal_id} in user memory cache")
+                    
+                    # If not found, try to load from file
+                    if not signal_found:
+                        user_signal_path = os.path.join(self.user_signals_dir, user_id, f"{signal_id}.json")
+                        if os.path.exists(user_signal_path):
+                            try:
+                                with open(user_signal_path, 'r') as f:
+                                    signal_data = json.load(f)
+                                signal_found = True
+                                logger.info(f"Found signal {signal_id} in user file storage")
+                                
+                                # Update memory cache
+                                if user_id not in self.user_signals:
+                                    self.user_signals[user_id] = {}
+                                self.user_signals[user_id][signal_id] = signal_data
+                            except Exception as e:
+                                logger.error(f"Error loading user signal file: {str(e)}")
+                    
+                    # If still not found, try central storage
+                    if not signal_found:
+                        central_signal_path = os.path.join(self.signals_dir, f"{signal_id}.json")
+                        if os.path.exists(central_signal_path):
+                            try:
+                                with open(central_signal_path, 'r') as f:
+                                    signal_data = json.load(f)
+                                signal_found = True
+                                logger.info(f"Found signal {signal_id} in central storage")
+                                
+                                # Add to user signals for future use
+                                if user_id not in self.user_signals:
+                                    self.user_signals[user_id] = {}
+                                self.user_signals[user_id][signal_id] = signal_data
+                                
+                                # Save to user specific storage
+                                self._save_user_signal(user_id, signal_id, signal_data)
+                            except Exception as e:
+                                logger.error(f"Error loading central signal file: {str(e)}")
+                    
+                    # Store additional signal info if available
+                    if signal_found and signal_data:
+                        context.user_data['signal_direction'] = signal_data.get('direction')
+                        context.user_data['signal_timeframe'] = signal_data.get('timeframe')
+                        # Backup copies
+                        context.user_data['signal_direction_backup'] = signal_data.get('direction')
+                        context.user_data['signal_timeframe_backup'] = signal_data.get('timeframe')
+                        logger.info(f"Stored signal details: direction={signal_data.get('direction')}, timeframe={signal_data.get('timeframe')}")}, timeframe={signal.get('interval')}")
             else:
                 # Legacy support - just extract the instrument
                 instrument = parts[3] if len(parts) >= 4 else None
@@ -4478,6 +4554,9 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                             self.user_signals[admin_str_id] = {}
                         
                         self.user_signals[admin_str_id][signal_id] = normalized_data
+                        
+                        # IMPROVED: Save user-specific signal
+                        self._save_user_signal(admin_str_id, signal_id, normalized_data)
                 except Exception as e:
                     logger.error(f"Error sending test signal to admin: {str(e)}")
             
@@ -4519,6 +4598,9 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         self.user_signals[user_str_id] = {}
                     
                     self.user_signals[user_str_id][signal_id] = normalized_data
+                    
+                    # IMPROVED: Save user-specific signal
+                    self._save_user_signal(user_str_id, signal_id, normalized_data)
                     
                 except Exception as e:
                     logger.error(f"Error sending signal to user {user_id}: {str(e)}")
@@ -4584,7 +4666,24 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             
             return message
             
+        
+    def _save_user_signal(self, user_id: str, signal_id: str, signal_data: Dict[str, Any]) -> None:
+        # Save a signal specifically for a user to ensure persistence
+        try:
+            # Create user's signal directory if it doesn't exist
+            user_signal_dir = os.path.join(self.user_signals_dir, user_id)
+            os.makedirs(user_signal_dir, exist_ok=True)
+            
+            # Save the signal data to the user's directory
+            signal_path = os.path.join(user_signal_dir, f"{signal_id}.json")
+            with open(signal_path, 'w') as f:
+                json.dump(signal_data, f)
+                
+            logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
+            logger.error(f"Error saving user signal: {str(e)}")
+    
+    except Exception as e:
             logger.error(f"Error formatting signal message: {str(e)}")
             # Return simple message on error
             return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
@@ -4621,6 +4720,70 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     self.logger.warning("Database does not have get_active_signals method - signals won't be loaded")
                     # Initialize empty user_signals dict
                     self.user_signals = {}
+        
+        # 2. Load from file system (more reliable for persistence)
+        signals_loaded = 0
+            
+        # Check the user signals directory
+        if os.path.exists(self.user_signals_dir):
+            # Iterate through each user directory
+            for user_id in os.listdir(self.user_signals_dir):
+                user_dir = os.path.join(self.user_signals_dir, user_id)
+                
+                # Skip if not a directory
+                if not os.path.isdir(user_dir):
+                    continue
+                    
+                # Initialize user dict if needed
+                if user_id not in self.user_signals:
+                    self.user_signals[user_id] = {}
+                
+                # Load each signal file for this user
+                for signal_file in os.listdir(user_dir):
+                    if signal_file.endswith('.json'):
+                        signal_path = os.path.join(user_dir, signal_file)
+                        
+                        try:
+                            with open(signal_path, 'r') as f:
+                                signal_data = json.load(f)
+                                
+                            if 'id' in signal_data:
+                                signal_id = signal_data['id']
+                                self.user_signals[user_id][signal_id] = signal_data
+                                signals_loaded += 1
+                        except Exception as file_error:
+                            self.logger.warning(f"Error loading signal file {signal_path}: {str(file_error)}")
+        
+        # 3. Check central signals directory as fallback
+        if os.path.exists(self.signals_dir):
+            central_signals_loaded = 0
+            
+            # Find json files in the signals directory
+            for signal_file in os.listdir(self.signals_dir):
+                if signal_file.endswith('.json') and os.path.isfile(os.path.join(self.signals_dir, signal_file)):
+                    signal_path = os.path.join(self.signals_dir, signal_file)
+                    
+                    try:
+                        with open(signal_path, 'r') as f:
+                            signal_data = json.load(f)
+                            
+                        if 'id' in signal_data:
+                            central_signals_loaded += 1
+                            
+                            # Store in admin user signals as fallback
+                            for admin_id in self.admin_users:
+                                admin_id_str = str(admin_id)
+                                if admin_id_str not in self.user_signals:
+                                    self.user_signals[admin_id_str] = {}
+                                    
+                                self.user_signals[admin_id_str][signal_data['id']] = signal_data
+                    except Exception as file_error:
+                        self.logger.warning(f"Error loading central signal file {signal_path}: {str(file_error)}")
+            
+            self.logger.info(f"Loaded {central_signals_loaded} signals from central storage")
+                    
+        self.logger.info(f"Loaded {signals_loaded} signals from file system for {len(self.user_signals)} users")
+    
             except AttributeError:
                 self.logger.warning("Database missing get_active_signals method - falling back to empty signals")
                 # Initialize empty user_signals dict
