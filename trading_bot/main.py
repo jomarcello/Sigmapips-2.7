@@ -2696,7 +2696,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             # Format: analyze_from_signal_INSTRUMENT_SIGNALID
             if len(parts) >= 4:
                 instrument = parts[3]
-                signal_id = parts[4] if len(parts) >= 5 else None
+                signal_id = "_".join(parts[4:]) if len(parts) > 4 else None # Correctly reconstruct signal_id
                 
                 # Store in context for other handlers
                 if context and hasattr(context, 'user_data'):
