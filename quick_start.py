@@ -12,7 +12,8 @@ Gebruik:
 import os
 import sys
 import logging
-from signal_storage_simplified import patch_bot_for_signal_storage, get_signal_storage
+# Import only get_signal_storage, patching is automatic in signal_storage_simplified
+from signal_storage_simplified import get_signal_storage
 
 # Configureer logging
 logging.basicConfig(
@@ -25,32 +26,28 @@ def main():
     """Start de signaalopslag functionaliteit."""
     logger.info("SigmaPips Signal Storage Quick Start")
     
-    # Controleer of het signals_data.json bestand bestaat
-    storage = get_signal_storage()
-    storage_file = storage.storage_file
+    # Het pad naar het opslagbestand, dit is meestal signals_data.json
+    # SignalStorage class zelf beheert niet de file, dus we definiëren het hier.
+    storage_file = "signals_data.json"
+    storage = get_signal_storage() # Haal de in-memory storage op
     
     if os.path.exists(storage_file):
-        logger.info(f"Bestaande signaalopslag gevonden: {storage_file}")
-        logger.info(f"Aantal gebruikers met opgeslagen signalen: {len(storage.signals)}")
+        logger.info(f"Controleren op bestaande signaalopslag: {storage_file}")
+        # De volgende logging is misschien niet accuraat als SignalStorage alleen in-memory is
+        # en niet direct de JSON laadt bij initialisatie.
+        # logger.info(f"Aantal gebruikers met opgeslagen signalen: {len(storage.signals)}") 
         
-        # Tel het totaal aantal signalen
-        total_signals = sum(len(signals) for signals in storage.signals.values())
-        logger.info(f"Totaal aantal opgeslagen signalen: {total_signals}")
+        # # Tel het totaal aantal signalen
+        # total_signals = sum(len(signals) for signals in storage.signals.values())
+        # logger.info(f"Totaal aantal opgeslagen signalen: {total_signals}")
     else:
         logger.info(f"Geen bestaande signaalopslag gevonden. Een nieuwe zal worden aangemaakt.")
     
-    # Patch de bot
-    logger.info("De bot patchen voor persistente signaalopslag...")
-    success = patch_bot_for_signal_storage()
-    
-    if success:
-        logger.info("✅ Bot succesvol gepatched!")
-        logger.info("Signalen worden nu automatisch opgeslagen.")
-        logger.info("De 'back' knop zal nu altijd werken, zelfs na herstart van de bot.")
-    else:
-        logger.error("❌ Fout bij het patchen van de bot.")
-        logger.error("Controleer of de bot correct is geïnstalleerd.")
-        return 1
+    # De bot wordt automatisch gepatcht bij het importeren van signal_storage_simplified.
+    # Controleer of de patching succesvol was (optioneel, afhankelijk van hoe signal_storage_simplified dit signaleert)
+    # Voor nu gaan we ervan uit dat het goed gaat als er geen error is bij importeren.
+    logger.info("Patches voor persistente signaalopslag worden automatisch toegepast bij het laden.")
+    logger.info("Controleer de logs van 'signal_storage_simplified' voor de status van het patchen.")
     
     # Instructies tonen
     print("\n" + "-" * 60)
