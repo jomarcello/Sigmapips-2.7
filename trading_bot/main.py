@@ -1356,8 +1356,11 @@ class TelegramService:
             message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
             
             return message
+        except Exception as e:
+            logger.error(f"Error formatting signal message: {str(e)}")
+            # Return simple message on error
+            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
             
-        
     def _save_user_signal(self, user_id: str, signal_id: str, signal_data: Dict[str, Any]) -> None:
         # Save a signal specifically for a user to ensure persistence
         try:
@@ -1373,11 +1376,6 @@ class TelegramService:
             logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
             logger.error(f"Error saving user signal: {str(e)}")
-    
-    except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
-            # Return simple message on error
-            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     def _register_handlers(self, application):
         """Register event handlers for bot commands and callback queries"""
@@ -4665,8 +4663,11 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
             
             return message
+        except Exception as e:
+            logger.error(f"Error formatting signal message: {str(e)}")
+            # Return simple message on error
+            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
             
-        
     def _save_user_signal(self, user_id: str, signal_id: str, signal_data: Dict[str, Any]) -> None:
         # Save a signal specifically for a user to ensure persistence
         try:
@@ -4682,11 +4683,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
             logger.error(f"Error saving user signal: {str(e)}")
-    
-    except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
-            # Return simple message on error
-            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     async def _load_signals(self):
         """Load stored signals from the database"""
