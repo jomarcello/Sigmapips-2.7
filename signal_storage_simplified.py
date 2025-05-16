@@ -121,7 +121,16 @@ def patch_signal_methods(bot_class):
     """
     # Save original methods
     original_store_signal_page = bot_class._store_original_signal_page
-    original_get_original_signal_page = bot_class._get_original_signal_page
+    # original_get_original_signal_page = bot_class._get_original_signal_page # This line causes AttributeError
+
+    # Define a dummy original_get_original_signal_page if it doesn't exist
+    if not hasattr(bot_class, '_get_original_signal_page'):
+        async def dummy_get_original_signal_page(self, update, context=None, signal_id=None):
+            return None
+        original_get_original_signal_page = dummy_get_original_signal_page
+        logger.info("'_get_original_signal_page' not found on bot_class. Using a dummy.")
+    else:
+        original_get_original_signal_page = bot_class._get_original_signal_page
     
     # Create patched methods
     @functools.wraps(original_store_signal_page)
