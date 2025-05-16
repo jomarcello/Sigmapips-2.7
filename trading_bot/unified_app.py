@@ -206,8 +206,20 @@ if __name__ == "__main__":
         shutdown_event = asyncio.Event()
         
         # Start the bot
-        loop.run_until_complete(run_bot_in_background())
+        bot_task = asyncio.ensure_future(run_bot_in_background())
         
+        # Keep the main thread running
+        logger.info("Main thread running, waiting for shutdown signal")
+        try:
+            # This will keep the main thread running until someone presses Ctrl+C
+            loop.run_forever()
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, shutting down")
+            # Set shutdown event to stop the bot
+            shared_state.shutdown_event.set()
+            # Wait for the bot to stop
+            loop.run_until_complete(bot_task)
+            
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received, shutting down")
     except Exception as e:
@@ -215,3 +227,5 @@ if __name__ == "__main__":
         logger.exception(e)
     finally:
         logger.info("Unified application shutting down") 
+        # Clean up the event loop
+        loop.close() 
