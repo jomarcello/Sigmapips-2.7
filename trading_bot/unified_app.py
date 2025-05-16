@@ -145,6 +145,11 @@ async def process_signal(request: Request):
         logger.error(f"Error processing signal: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing signal: {str(e)}")
 
+# Register additional webhook routes
+from trading_bot.routing import register_webhook_routes
+register_webhook_routes(app)
+logger.info("Registered additional webhook routes")
+
 # Function to run the bot in the background
 async def run_bot_in_background():
     """Run the Telegram bot in the background"""

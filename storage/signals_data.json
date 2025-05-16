@@ -1,0 +1,12 @@
+{
+  "test_user": {
+    "test_123": {
+      "id": "test_123",
+      "instrument": "EURUSD",
+      "direction": "buy",
+      "price": "1.2345",
+      "message": "Dit is een test signaal",
+      "timestamp": "2025-05-15T17:12:47.268665"
+    }
+  }
+}

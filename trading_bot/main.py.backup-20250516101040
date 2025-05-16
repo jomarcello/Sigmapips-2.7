@@ -1356,11 +1356,8 @@ class TelegramService:
             message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
             
             return message
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
-            # Return simple message on error
-            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
             
+        
     def _save_user_signal(self, user_id: str, signal_id: str, signal_data: Dict[str, Any]) -> None:
         # Save a signal specifically for a user to ensure persistence
         try:
@@ -1376,6 +1373,11 @@ class TelegramService:
             logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
             logger.error(f"Error saving user signal: {str(e)}")
+    
+    except Exception as e:
+            logger.error(f"Error formatting signal message: {str(e)}")
+            # Return simple message on error
+            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     def _register_handlers(self, application):
         """Register event handlers for bot commands and callback queries"""
@@ -2538,31 +2540,25 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             signal_instrument = None
             signal_direction = None
             signal_timeframe = None
-            signal_id = None
             
             if context and hasattr(context, 'user_data'):
                 # Try to get from backup fields first (these are more reliable after navigation)
                 signal_instrument = context.user_data.get('signal_instrument_backup') or context.user_data.get('signal_instrument')
                 signal_direction = context.user_data.get('signal_direction_backup') or context.user_data.get('signal_direction')
                 signal_timeframe = context.user_data.get('signal_timeframe_backup') or context.user_data.get('signal_timeframe')
-                signal_id = context.user_data.get('signal_id_backup') or context.user_data.get('signal_id')
                 
                 # Reset signal flow flags but keep the signal info
                 context.user_data['from_signal'] = True
-                context.user_data['in_signal_flow'] = True
                 
                 # Log retrieved values for debugging
-                logger.info(f"Retrieved signal data from context: instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}, signal_id={signal_id}")
+                logger.info(f"Retrieved signal data from context: instrument={signal_instrument}, direction={signal_direction}, timeframe={signal_timeframe}")
             
             # Find the most recent signal for this user based on context data
             signal_data = None
+            signal_id = None
             
-            # First try with signal_id if available (most reliable)
-            if signal_id and str(user_id) in self.user_signals and signal_id in self.user_signals[str(user_id)]:
-                signal_data = self.user_signals[str(user_id)][signal_id]
-                logger.info(f"Found signal directly by ID: {signal_id}")
-            # Otherwise find matching signal based on instrument and direction
-            elif str(user_id) in self.user_signals:
+            # Find matching signal based on instrument and direction
+            if str(user_id) in self.user_signals:
                 user_signal_dict = self.user_signals[str(user_id)]
                 # Find signals matching instrument, direction and timeframe
                 matching_signals = []
@@ -2575,7 +2571,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     if signal_direction:
                         direction_match = sig.get('direction') == signal_direction
                     if signal_timeframe:
-                        timeframe_match = sig.get('interval') == signal_timeframe or sig.get('timeframe') == signal_timeframe
+                        timeframe_match = sig.get('interval') == signal_timeframe
                     
                     if instrument_match and direction_match and timeframe_match:
                         matching_signals.append((sig_id, sig))
@@ -2597,42 +2593,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         matching_signals.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
                         signal_id, signal_data = matching_signals[0]
                         logger.info(f"Found signal with just instrument match, ID: {signal_id}")
-            
-            # If not found in memory cache, try to load from storage
-            if not signal_data:
-                # First try user-specific storage
-                if signal_id:
-                    user_signal_path = os.path.join(self.user_signals_dir, str(user_id), f"{signal_id}.json")
-                    if os.path.exists(user_signal_path):
-                        try:
-                            with open(user_signal_path, 'r') as f:
-                                signal_data = json.load(f)
-                            logger.info(f"Loaded signal {signal_id} from user file storage")
-                        except Exception as e:
-                            logger.error(f"Error loading signal from file: {str(e)}")
-                
-                # If still not found and we have a database connection, try the database
-                if not signal_data and hasattr(self, 'db') and self.db:
-                    try:
-                        # Try to get signal by ID first
-                        if signal_id:
-                            signal_data = await self.db.get_signal(user_id, signal_id)
-                            logger.info(f"Loaded signal {signal_id} from database")
-                        
-                        # If still not found, try to get by instrument
-                        if not signal_data and signal_instrument:
-                            user_signals = await self.db.get_signals_for_instrument(user_id, signal_instrument)
-                            if user_signals:
-                                # Sort by timestamp if available
-                                if isinstance(user_signals, dict):
-                                    user_signals = list(user_signals.values())
-                                
-                                # Extract the most recent one
-                                signal_data = user_signals[0]  # Assume already sorted with newest first
-                                signal_id = signal_data.get('id')
-                                logger.info(f"Loaded signal for {signal_instrument} from database")
-                    except Exception as db_err:
-                        logger.error(f"Error getting signal from database: {str(db_err)}")
             
             if not signal_data:
                 # Fallback message if signal not found
@@ -2658,20 +2618,10 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 parse_mode=ParseMode.HTML
             )
             
-            # Store this signal in memory for future use
-            if signal_id:
-                if str(user_id) not in self.user_signals:
-                    self.user_signals[str(user_id)] = {}
-                self.user_signals[str(user_id)][signal_id] = signal_data
-                
-                # Also persist to user's signal directory
-                self._save_user_signal(str(user_id), signal_id, signal_data)
-            
             return SIGNAL_DETAILS
             
         except Exception as e:
             logger.error(f"Error in back_to_signal_callback: {str(e)}")
-            logger.exception(e)
             
             # Error recovery
             try:
@@ -2765,7 +2715,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         # Backup copies
                         context.user_data['signal_direction_backup'] = signal_data.get('direction')
                         context.user_data['signal_timeframe_backup'] = signal_data.get('timeframe')
-                        logger.info(f"Stored signal details: direction={signal_data.get('direction')}, timeframe={signal_data.get('timeframe')}")
+                        logger.info(f"Stored signal details: direction={signal_data.get('direction')}, timeframe={signal_data.get('timeframe')}")}, timeframe={signal.get('interval')}")
             else:
                 # Legacy support - just extract the instrument
                 instrument = parts[3] if len(parts) >= 4 else None
@@ -4715,11 +4665,8 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             message += f"<b>🤖 SigmaPips AI Verdict:</b>\n{ai_verdict}"
             
             return message
-        except Exception as e:
-            logger.error(f"Error formatting signal message: {str(e)}")
-            # Return simple message on error
-            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
             
+        
     def _save_user_signal(self, user_id: str, signal_id: str, signal_data: Dict[str, Any]) -> None:
         # Save a signal specifically for a user to ensure persistence
         try:
@@ -4735,16 +4682,17 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
             logger.error(f"Error saving user signal: {str(e)}")
+    
+    except Exception as e:
+            logger.error(f"Error formatting signal message: {str(e)}")
+            # Return simple message on error
+            return f"New {signal_data.get('instrument', 'Unknown')} {signal_data.get('direction', 'Unknown')} Signal"
 
     async def _load_signals(self):
         """Load stored signals from the database"""
         try:
             self.logger.info("Loading stored signals")
             
-            # Initialize signals container
-            self.user_signals = {}
-            
-            # 1. First try to load from database
             try:
                 # Check if the get_active_signals method exists on the database object
                 if hasattr(self.db, 'get_active_signals'):
@@ -4770,73 +4718,79 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                                 self.user_signals[user_id][market].append(instrument)
                 else:
                     self.logger.warning("Database does not have get_active_signals method - signals won't be loaded")
-            except AttributeError:
-                self.logger.warning("Database missing get_active_signals method - falling back to empty signals")
+                    # Initialize empty user_signals dict
+                    self.user_signals = {}
+        
+        # 2. Load from file system (more reliable for persistence)
+        signals_loaded = 0
             
-            # 2. Load from file system (more reliable for persistence)
-            signals_loaded = 0
+        # Check the user signals directory
+        if os.path.exists(self.user_signals_dir):
+            # Iterate through each user directory
+            for user_id in os.listdir(self.user_signals_dir):
+                user_dir = os.path.join(self.user_signals_dir, user_id)
                 
-            # Check the user signals directory
-            if os.path.exists(self.user_signals_dir):
-                # Iterate through each user directory
-                for user_id in os.listdir(self.user_signals_dir):
-                    user_dir = os.path.join(self.user_signals_dir, user_id)
+                # Skip if not a directory
+                if not os.path.isdir(user_dir):
+                    continue
                     
-                    # Skip if not a directory
-                    if not os.path.isdir(user_dir):
-                        continue
-                        
-                    # Initialize user dict if needed
-                    if user_id not in self.user_signals:
-                        self.user_signals[user_id] = {}
-                    
-                    # Load each signal file for this user
-                    for signal_file in os.listdir(user_dir):
-                        if signal_file.endswith('.json'):
-                            signal_path = os.path.join(user_dir, signal_file)
-                            
-                            try:
-                                with open(signal_path, 'r') as f:
-                                    signal_data = json.load(f)
-                                    
-                                if 'id' in signal_data:
-                                    signal_id = signal_data['id']
-                                    self.user_signals[user_id][signal_id] = signal_data
-                                    signals_loaded += 1
-                            except Exception as file_error:
-                                self.logger.warning(f"Error loading signal file {signal_path}: {str(file_error)}")
-            
-            # 3. Check central signals directory as fallback
-            if os.path.exists(self.signals_dir):
-                central_signals_loaded = 0
+                # Initialize user dict if needed
+                if user_id not in self.user_signals:
+                    self.user_signals[user_id] = {}
                 
-                # Find json files in the signals directory
-                for signal_file in os.listdir(self.signals_dir):
-                    if signal_file.endswith('.json') and os.path.isfile(os.path.join(self.signals_dir, signal_file)):
-                        signal_path = os.path.join(self.signals_dir, signal_file)
+                # Load each signal file for this user
+                for signal_file in os.listdir(user_dir):
+                    if signal_file.endswith('.json'):
+                        signal_path = os.path.join(user_dir, signal_file)
                         
                         try:
                             with open(signal_path, 'r') as f:
                                 signal_data = json.load(f)
                                 
                             if 'id' in signal_data:
-                                central_signals_loaded += 1
-                                
-                                # Store in admin user signals as fallback
-                                for admin_id in self.admin_users:
-                                    admin_id_str = str(admin_id)
-                                    if admin_id_str not in self.user_signals:
-                                        self.user_signals[admin_id_str] = {}
-                                        
-                                    self.user_signals[admin_id_str][signal_data['id']] = signal_data
+                                signal_id = signal_data['id']
+                                self.user_signals[user_id][signal_id] = signal_data
+                                signals_loaded += 1
                         except Exception as file_error:
-                            self.logger.warning(f"Error loading central signal file {signal_path}: {str(file_error)}")
+                            self.logger.warning(f"Error loading signal file {signal_path}: {str(file_error)}")
+        
+        # 3. Check central signals directory as fallback
+        if os.path.exists(self.signals_dir):
+            central_signals_loaded = 0
+            
+            # Find json files in the signals directory
+            for signal_file in os.listdir(self.signals_dir):
+                if signal_file.endswith('.json') and os.path.isfile(os.path.join(self.signals_dir, signal_file)):
+                    signal_path = os.path.join(self.signals_dir, signal_file)
+                    
+                    try:
+                        with open(signal_path, 'r') as f:
+                            signal_data = json.load(f)
+                            
+                        if 'id' in signal_data:
+                            central_signals_loaded += 1
+                            
+                            # Store in admin user signals as fallback
+                            for admin_id in self.admin_users:
+                                admin_id_str = str(admin_id)
+                                if admin_id_str not in self.user_signals:
+                                    self.user_signals[admin_id_str] = {}
+                                    
+                                self.user_signals[admin_id_str][signal_data['id']] = signal_data
+                    except Exception as file_error:
+                        self.logger.warning(f"Error loading central signal file {signal_path}: {str(file_error)}")
+            
+            self.logger.info(f"Loaded {central_signals_loaded} signals from central storage")
+                    
+        self.logger.info(f"Loaded {signals_loaded} signals from file system for {len(self.user_signals)} users")
+    
+            except AttributeError:
+                self.logger.warning("Database missing get_active_signals method - falling back to empty signals")
+                # Initialize empty user_signals dict
+                self.user_signals = {}
                 
-                self.logger.info(f"Loaded {central_signals_loaded} signals from central storage")
-                        
-            self.logger.info(f"Loaded {signals_loaded} signals from file system for {len(self.user_signals)} users")
             self.logger.info("Signals loaded")
-                
+            
         except Exception as e:
             self.logger.error(f"Error loading signals: {str(e)}")
             self.logger.exception(e)
@@ -5413,51 +5367,6 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             logger.error(f"Error running the bot: {str(e)}")
             logger.exception(e)
             raise
-
-    async def _store_original_signal_page(self, update: Update, context=None, instrument=None, signal_id=None):
-        """Store the original signal page data to ensure we can return to it later"""
-        try:
-            logger.info(f"Storing original signal page for instrument={instrument}, signal_id={signal_id}")
-            
-            if not context or not hasattr(context, 'user_data'):
-                logger.warning("Cannot store signal page: no context.user_data available")
-                return
-                
-            # Store signal identifiers in context for retrieval
-            if instrument:
-                context.user_data['signal_instrument'] = instrument
-                context.user_data['signal_instrument_backup'] = instrument
-                
-            if signal_id:
-                context.user_data['signal_id'] = signal_id
-                context.user_data['signal_id_backup'] = signal_id
-                
-            # Set signal flow flags
-            context.user_data['from_signal'] = True
-            context.user_data['in_signal_flow'] = True
-            
-            # Try to get additional signal data if available
-            user_id = str(update.effective_user.id)
-            if signal_id and user_id in self.user_signals and signal_id in self.user_signals[user_id]:
-                signal_data = self.user_signals[user_id][signal_id]
-                
-                # Store direction and timeframe
-                if 'direction' in signal_data:
-                    context.user_data['signal_direction'] = signal_data['direction']
-                    context.user_data['signal_direction_backup'] = signal_data['direction']
-                
-                            # Use interval or timeframe, whichever is available
-                timeframe = signal_data.get('interval') or signal_data.get('timeframe')
-                if timeframe:
-                            context.user_data['signal_timeframe'] = timeframe
-                            context.user_data['signal_timeframe_backup'] = timeframe
-                    
-                logger.info(f"Stored signal details: direction={signal_data.get('direction')}, timeframe={timeframe}")
-            else:
-                logger.info(f"No additional signal data found for signal_id={signal_id}")
-        
-        except Exception as e:
-            logger.error(f"Error in _store_original_signal_page: {str(e)}")
 
 if __name__ == "__main__":
     # Create parser for command-line arguments

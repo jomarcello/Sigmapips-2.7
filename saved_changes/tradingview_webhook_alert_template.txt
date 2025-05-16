@@ -1,0 +1,80 @@
+# TradingView Webhook Alert Template
+
+Hieronder vind je templates voor het configureren van TradingView webhook alerts die compatibel zijn met je SigmaPips-systeem.
+
+## Webhook URL
+
+Gebruik deze URL in je TradingView webhook alert configuratie:
+```
+https://railwaywebhook-production-8102.up.railway.app/webhook
+```
+
+## JSON Payload Templates
+
+### Basis Template (Aanbevolen)
+
+```json
+{
+  "instrument": "{{ticker}}",
+  "direction": "{{strategy.order.action}}",
+  "entry": {{close}},
+  "stop_loss": {{strategy.order.stop_price}},
+  "take_profit": [
+    {{strategy.order.take_profit_1}},
+    {{strategy.order.take_profit_2}},
+    {{strategy.order.take_profit_3}}
+  ],
+  "timeframe": "{{interval}}",
+  "timestamp": "{{timenow}}",
+  "strategy": "{{strategy.order.comment}}",
+  "risk_reward": {{strategy.risk_reward}},
+  "risk_percentage": {{strategy.risk_percentage}}
+}
+```
+
+### Alternatieve Template (Kortere versie)
+
+```json
+{
+  "instrument": "{{ticker}}",
+  "direction": "{{strategy.order.action}}",
+  "entry": {{close}},
+  "stop_loss": {{strategy.position.stop}},
+  "take_profit": {{strategy.position.tp}},
+  "timeframe": "{{interval}}",
+  "timestamp": "{{timenow}}"
+}
+```
+
+### Handmatige Alert Template
+
+```json
+{
+  "instrument": "EURUSD",
+  "direction": "BUY",
+  "entry": 1.0850,
+  "stop_loss": 1.0800,
+  "take_profit": [1.0900, 1.0950, 1.1000],
+  "timeframe": "4H",
+  "timestamp": "{% timenow %}",
+  "strategy": "Manual Alert"
+}
+```
+
+## Hoe te Gebruiken
+
+1. In TradingView, ga naar "Alerts" en klik op "Create Alert"
+2. Configureer de alert voorwaarden naar wens
+3. Scroll naar beneden naar "Alert actions"
+4. Selecteer "Webhook URL"
+5. Plak de webhook URL hierboven
+6. Kopieer en plak een van de JSON templates in het "Message" veld
+7. Pas de parameters aan voor jouw specifieke strategie
+8. Klik op "Create" om de alert op te slaan
+
+## Opmerkingen
+
+- De waarden tussen {{}} worden automatisch ingevuld door TradingView
+- Zorg ervoor dat je geldige JSON opbouwt - let op quotes en komma's
+- Als een waarde niet beschikbaar is, gebruik dan een standaardwaarde
+- Test alerts handmatig voordat je ze in productie gebruikt 
