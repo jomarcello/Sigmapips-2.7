@@ -2715,7 +2715,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                         # Backup copies
                         context.user_data['signal_direction_backup'] = signal_data.get('direction')
                         context.user_data['signal_timeframe_backup'] = signal_data.get('timeframe')
-                        logger.info(f"Stored signal details: direction={signal_data.get('direction')}, timeframe={signal_data.get('timeframe')}")}, timeframe={signal.get('interval')}")
+                        logger.info(f"Stored signal details: direction={signal_data.get('direction')}, timeframe={signal_data.get('timeframe')}")
             else:
                 # Legacy support - just extract the instrument
                 instrument = parts[3] if len(parts) >= 4 else None
