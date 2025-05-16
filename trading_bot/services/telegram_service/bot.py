@@ -2597,6 +2597,13 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                     if signal_id:
                         context.user_data['signal_id'] = signal_id
                     
+                    # Ensure the original signal page data is stored using the patched method
+                    if hasattr(self, '_store_original_signal_page') and callable(self._store_original_signal_page):
+                        logger.info(f"Calling _store_original_signal_page for instrument={instrument}, signal_id={signal_id} in analyze_from_signal_callback")
+                        await self._store_original_signal_page(update, context, instrument, signal_id)
+                    else:
+                        logger.warning("_store_original_signal_page method not found or not callable on self.")
+
                     # Set signal flow flags
                     context.user_data['from_signal'] = True
                     context.user_data['in_signal_flow'] = True
