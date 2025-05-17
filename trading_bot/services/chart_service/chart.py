@@ -894,10 +894,13 @@ class ChartService:
             
         # Bitcoin and major cryptos
         if instrument in ["BTCUSD", "BTCUSDT"]:
-            return 2  # Bitcoin usually displayed with 2 decimal places
+            return 0  # Bitcoin displayed with 0 decimal places
             
         # Ethereum and high-value cryptos
-        if instrument in ["ETHUSD", "ETHUSDT", "BNBUSD", "BNBUSDT", "SOLUSD", "SOLUSDT"]:
+        if instrument in ["ETHUSD", "ETHUSDT"]:
+            return 1  # Ethereum displayed with 1 decimal place
+            
+        if instrument in ["BNBUSD", "BNBUSDT", "SOLUSD", "SOLUSDT"]:
             return 2  # These often shown with 2 decimal places
         
         # Other cryptos
@@ -1079,7 +1082,8 @@ class ChartService:
                 logger.error(f"No current price available for {instrument}")
                 return f"⚠️ <b>Error:</b> No price data available for {instrument}."
                 
-            formatted_price = f"{current_price:.{precision}f}"
+            # Format price with appropriate precision and thousands separators
+            formatted_price = f"{current_price:,.{precision}f}"
             
             # Get key indicators
             ema_20 = metadata.get('ema_20', None)
@@ -1179,13 +1183,13 @@ class ChartService:
             ma_analysis = "Moving average data not available"
             if ema_50 is not None and ema_200 is not None and current_price is not None:
                 if current_price > ema_50 and current_price > ema_200:
-                    ma_analysis = f"Price above EMA 50 ({ema_50:.{precision}f}) and above EMA 200 ({ema_200:.{precision}f}), confirming bullish bias."
+                    ma_analysis = f"Price above EMA 50 ({ema_50:,.{precision}f}) and above EMA 200 ({ema_200:,.{precision}f}), confirming bullish bias."
                 elif current_price < ema_50 and current_price < ema_200:
-                    ma_analysis = f"Price below EMA 50 ({ema_50:.{precision}f}) and below EMA 200 ({ema_200:.{precision}f}), confirming bearish bias."
+                    ma_analysis = f"Price below EMA 50 ({ema_50:,.{precision}f}) and below EMA 200 ({ema_200:,.{precision}f}), confirming bearish bias."
                 elif current_price > ema_50 and current_price < ema_200:
-                    ma_analysis = f"Price above EMA 50 ({ema_50:.{precision}f}) but below EMA 200 ({ema_200:.{precision}f}), showing mixed signals."
+                    ma_analysis = f"Price above EMA 50 ({ema_50:,.{precision}f}) but below EMA 200 ({ema_200:,.{precision}f}), showing mixed signals."
                 else:
-                    ma_analysis = f"Price below EMA 50 ({ema_50:.{precision}f}) but above EMA 200 ({ema_200:.{precision}f}), showing mixed signals."
+                    ma_analysis = f"Price below EMA 50 ({ema_50:,.{precision}f}) but above EMA 200 ({ema_200:,.{precision}f}), showing mixed signals."
             
             # Generate market overview
             if market_direction == "bullish":
@@ -1201,19 +1205,19 @@ class ChartService:
             # Generate AI recommendation
             if daily_high is not None and daily_low is not None:
                 if market_direction == "bullish":
-                    recommendation = f"Watch for a breakout above {daily_high:.{precision}f} for further upside. Maintain a buy bias while price holds above {daily_low:.{precision}f}. Be cautious of overbought conditions if RSI approaches 70."
+                    recommendation = f"Watch for a breakout above {daily_high:,.{precision}f} for further upside. Maintain a buy bias while price holds above {daily_low:,.{precision}f}. Be cautious of overbought conditions if RSI approaches 70."
                 elif market_direction == "bearish":
-                    recommendation = f"Watch for a breakdown below {daily_low:.{precision}f} for further downside. Maintain a sell bias while price holds below {daily_high:.{precision}f}. Be cautious of oversold conditions if RSI approaches 30."
+                    recommendation = f"Watch for a breakdown below {daily_low:,.{precision}f} for further downside. Maintain a sell bias while price holds below {daily_high:,.{precision}f}. Be cautious of oversold conditions if RSI approaches 30."
                 else:
-                    recommendation = f"Market is in consolidation. Wait for a breakout above {daily_high:.{precision}f} or breakdown below {daily_low:.{precision}f} before taking a position. Monitor volume for breakout confirmation."
+                    recommendation = f"Market is in consolidation. Wait for a breakout above {daily_high:,.{precision}f} or breakdown below {daily_low:,.{precision}f} before taking a position. Monitor volume for breakout confirmation."
             else:
                 recommendation = "Insufficient data for a specific recommendation."
             
             # Format key levels properly
-            daily_high_formatted = f"{daily_high:.{precision}f}" if daily_high is not None else "N/A"
-            daily_low_formatted = f"{daily_low:.{precision}f}" if daily_low is not None else "N/A"
-            weekly_high_formatted = f"{weekly_high:.{precision}f}" if weekly_high is not None else "N/A"
-            weekly_low_formatted = f"{weekly_low:.{precision}f}" if weekly_low is not None else "N/A"
+            daily_high_formatted = f"{daily_high:,.{precision}f}" if daily_high is not None else "N/A"
+            daily_low_formatted = f"{daily_low:,.{precision}f}" if daily_low is not None else "N/A"
+            weekly_high_formatted = f"{weekly_high:,.{precision}f}" if weekly_high is not None else "N/A"
+            weekly_low_formatted = f"{weekly_low:,.{precision}f}" if weekly_low is not None else "N/A"
             
             # Generate analysis text
             analysis = f"""{display_name} Analysis
