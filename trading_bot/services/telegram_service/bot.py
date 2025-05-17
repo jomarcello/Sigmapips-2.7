@@ -894,24 +894,17 @@ class TelegramService:
         
         logger.info("back_signals_callback called")
         
-        # Make sure we're in the signals flow context
+        # Reset signal-specific flags
         if context and hasattr(context, 'user_data'):
-            # Keep is_signals_context flag but reset from_signal flag
+            # Make sure we're still in signals context
             context.user_data['is_signals_context'] = True
-            context.user_data['from_signal'] = False
             
-            # Clear other specific analysis keys but maintain signals context
-            keys_to_remove = [
-                'instrument', 'market', 'analysis_type', 'timeframe', 
-                'signal_id', 'signal_instrument', 'signal_direction', 'signal_timeframe',
-                'loading_message'
-            ]
+            # Ensure we're not in adding_signals mode
+            if 'adding_signals' in context.user_data:
+                del context.user_data['adding_signals']
+                logger.info("Reset adding_signals flag in context")
             
-            for key in keys_to_remove:
-                if key in context.user_data:
-                    del context.user_data[key]
-            
-            logger.info(f"Updated context in back_signals_callback: {context.user_data}")
+            logger.info(f"back_signals_callback context: {context.user_data}")
         
         # Create keyboard for signal menu
         keyboard = [
@@ -921,10 +914,7 @@ class TelegramService:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Get the signals GIF URL for better UX
-        signals_gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
-        
-        # Update the message
+        # Update message
         await self.update_message(
             query=query,
             text="<b>📈 Signal Management</b>\n\nManage your trading signals",
@@ -1535,6 +1525,19 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         """Handle menu_analyse button press"""
         query = update.callback_query
         await query.answer()
+        
+        logger.info("menu_analyse_callback called")
+        
+        # Set proper context for menu flow
+        if context and hasattr(context, 'user_data'):
+            # First clear any signal context
+            if context.user_data.get('is_signals_context', False):
+                logger.info("Clearing signal context in menu_analyse_callback")
+                context.user_data['is_signals_context'] = False
+            
+            # Set menu flow flag
+            context.user_data['current_flow'] = 'menu'
+            logger.info(f"Set menu flow context: {context.user_data}")
         
         # Gebruik de juiste analyse GIF URL
         gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
@@ -2803,17 +2806,30 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         parts = callback_data.split("_")
         market = parts[1]  # Extract market type (forex, crypto, etc.)
         
-        # Check if signal-specific context
+        # Check if signal-specific context and what flow we're in
         is_signals_context = False
+        current_flow = None
+        
         if callback_data.endswith("_signals"):
             is_signals_context = True
         elif context and hasattr(context, 'user_data'):
             is_signals_context = context.user_data.get('is_signals_context', False)
+            current_flow = context.user_data.get('current_flow', None)
         
-        # Store market in context
+        # Store context information
         if context and hasattr(context, 'user_data'):
+            # Store the market selection
             context.user_data['market'] = market
+            
+            # Maintain signal context flag
             context.user_data['is_signals_context'] = is_signals_context
+            
+            # Keep the current_flow value if it exists
+            if current_flow:
+                # Don't overwrite the current_flow if it's already set
+                logger.info(f"Preserving current_flow: {current_flow}")
+            
+            logger.info(f"market_callback context: is_signals_context={is_signals_context}, current_flow={current_flow}, market={market}")
         
         logger.info(f"Market callback: market={market}, signals_context={is_signals_context}")
         
@@ -2920,14 +2936,27 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         
         # Determine if we need to go back to signals or analysis flow
         is_signals_context = False
-        if context and hasattr(context, 'user_data'):
-            is_signals_context = context.user_data.get('is_signals_context', False)
+        from_menu_flow = False
         
-        if is_signals_context:
+        if context and hasattr(context, 'user_data'):
+            # Check which flow we're in
+            is_signals_context = context.user_data.get('is_signals_context', False)
+            from_menu_flow = context.user_data.get('current_flow', '') == 'menu'
+            
+            # Log the current context state for debugging
+            logger.info(f"back_market_callback context: is_signals_context={is_signals_context}, from_menu_flow={from_menu_flow}, user_data={context.user_data}")
+        
+        # Prioritize menu flow if that's where we came from
+        if from_menu_flow:
+            logger.info("Going back to main menu from market selection (menu flow)")
+            return await self.back_menu_callback(update, context)
+        elif is_signals_context:
             # Go back to signals menu
+            logger.info("Going back to signals menu from market selection")
             return await self.back_signals_callback(update, context)
         else:
             # Go back to analysis selection
+            logger.info("Going back to analysis menu from market selection")
             return await self.analysis_callback(update, context)
 
     async def instrument_signals_callback(self, update: Update, context=None) -> int:
@@ -3714,6 +3743,18 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         
         logger.info("back_signals_callback called")
         
+        # Reset signal-specific flags
+        if context and hasattr(context, 'user_data'):
+            # Make sure we're still in signals context
+            context.user_data['is_signals_context'] = True
+            
+            # Ensure we're not in adding_signals mode
+            if 'adding_signals' in context.user_data:
+                del context.user_data['adding_signals']
+                logger.info("Reset adding_signals flag in context")
+            
+            logger.info(f"back_signals_callback context: {context.user_data}")
+        
         # Create keyboard for signal menu
         keyboard = [
             [InlineKeyboardButton("📊 Add Signal", callback_data="signals_add")],
@@ -4145,15 +4186,13 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             return CHOOSE_SIGNALS
         
     async def back_instrument_callback(self, update: Update, context=None) -> int:
-        """Handle back button to return to instrument selection"""
+        """Handle back button to return to market selection from instrument view"""
         query = update.callback_query
         await query.answer()
         
         # Add detailed logging
         logger.info("back_instrument_callback called")
         logger.info(f"Query data: {query.data}")
-        if context and hasattr(context, 'user_data'):
-            logger.info(f"Context user_data: {context.user_data}")
         
         try:
             # Clear style/timeframe data but keep instrument
@@ -4162,30 +4201,44 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 for key in keys_to_clear:
                     if key in context.user_data:
                         del context.user_data[key]
-                logger.info("Cleared style/timeframe data from context")
-            
-            # Get market and analysis type from context
-            market = None
-            analysis_type = None
-            if context and hasattr(context, 'user_data'):
+                
+                # Get context flags
                 market = context.user_data.get('market')
                 analysis_type = context.user_data.get('analysis_type')
                 is_signals_context = context.user_data.get('is_signals_context', False)
-                logger.info(f"Context info: market={market}, analysis_type={analysis_type}, is_signals_context={is_signals_context}")
+                current_flow = context.user_data.get('current_flow', None)
+                
+                logger.info(f"Context info: market={market}, analysis_type={analysis_type}, " + 
+                           f"is_signals_context={is_signals_context}, current_flow={current_flow}")
+            else:
+                is_signals_context = False
+                current_flow = None
+                market = None
             
             if not market:
                 logger.warning("No market found in context, defaulting to forex")
                 market = "forex"
             
-            # If we're in signals context, go back to signals menu
-            if is_signals_context and hasattr(self, 'back_signals_callback'):
-                logger.info("Going back to signals menu because is_signals_context=True")
-                return await self.back_signals_callback(update, context)
-            
-            # Otherwise go back to market selection
-            logger.info("Going back to market selection")
-            return await self.back_market_callback(update, context)
-            
+            # First check if we're in the menu flow (highest priority)
+            if current_flow == 'menu':
+                logger.info("Going back to market selection (menu flow)")
+                return await self.back_market_callback(update, context)
+            # Then check if we're in signals context
+            elif is_signals_context:
+                logger.info("Going back to signals flow")
+                if 'adding_signals' in context.user_data and context.user_data['adding_signals']:
+                    # If we're adding signals, go back to market selection
+                    logger.info("Going back to market selection (signals add flow)")
+                    return await self.back_market_callback(update, context)
+                else:
+                    # Otherwise go back to signals menu
+                    logger.info("Going back to signals menu")
+                    return await self.back_signals_callback(update, context)
+            else:
+                # Default: go back to market selection
+                logger.info("Going back to market selection (default analysis flow)")
+                return await self.back_market_callback(update, context)
+                
         except Exception as e:
             logger.error(f"Failed to handle back_instrument_callback: {str(e)}")
             logger.exception(e)
