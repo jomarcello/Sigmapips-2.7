@@ -1056,21 +1056,21 @@ class ChartService:
             # Format instrument name to match Yahoo Finance/TradingView style
             display_name = instrument
             if instrument == "XAUUSD":
-                display_name = "Gold (GC=F)"
+                display_name = "Gold"
             elif instrument == "XTIUSD" or instrument == "USOIL":
-                display_name = "Crude Oil (CL=F)"
+                display_name = "Crude Oil"
             elif instrument == "XAGUSD":
-                display_name = "Silver (SI=F)"
+                display_name = "Silver"
             elif instrument == "US500":
-                display_name = "S&P 500 (^GSPC)"
+                display_name = "S&P 500"
             elif instrument == "US30":
-                display_name = "Dow Jones (^DJI)"
+                display_name = "Dow Jones"
             elif instrument == "US100":
-                display_name = "Nasdaq (^IXIC)"
+                display_name = "Nasdaq"
             elif instrument == "DE40":
-                display_name = "DAX (^GDAXI)"
+                display_name = "DAX"
             elif instrument == "UK100":
-                display_name = "FTSE 100 (^FTSE)"
+                display_name = "FTSE 100"
             
             # Format price with appropriate precision
             precision = self._get_instrument_precision(instrument)
