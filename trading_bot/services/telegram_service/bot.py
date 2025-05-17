@@ -1605,249 +1605,152 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
         
         return CHOOSE_ANALYSIS
 
-    async def show_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE = None, skip_gif=False) -> int: # Ensure it returns int for state
-        """Displays the main menu to the user."""
+    async def show_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message_id=None):
+        """Displays the main menu."""
+        user_id = update.effective_user.id
+        logger.info(f"User {user_id} entering show_main_menu.")
+        
+        context.user_data['current_flow'] = 'menu'
+        
+        # Explicitly ensure no signal context remnants when showing main menu
+        cleared_any_signal_flag = False
+        if context.user_data.pop('is_signals_context', None) is not None:
+            logger.info(f"show_main_menu: Cleared 'is_signals_context' for user {user_id}.")
+            cleared_any_signal_flag = True
+        if context.user_data.pop('from_signal', None) is not None:
+            logger.info(f"show_main_menu: Cleared 'from_signal' for user {user_id}.")
+            cleared_any_signal_flag = True
+        
+        if cleared_any_signal_flag:
+            logger.debug(f"show_main_menu: User_data after clearing signal flags for {user_id}: {context.user_data}")
+
+        # Fetch user's subscription status
         try:
-            # Set up logging
-            logger.info("show_main_menu called")
+            is_subscribed = await self.db.is_user_subscribed(user_id)
+            payment_failed = await self.db.has_payment_failed(user_id)
+            logger.info(f"User subscription: is_subscribed={is_subscribed}, payment_failed={payment_failed}")
+        except Exception as sub_error:
+            logger.error(f"Error checking subscription: {str(sub_error)}")
+            logger.error(traceback.format_exc())
+            # Default to subscribed for error cases
+            is_subscribed = True
+            payment_failed = False
+        
+        if is_subscribed and not payment_failed:
+            # Show the main menu for subscribed users
+            reply_markup = InlineKeyboardMarkup(START_KEYBOARD)
             
-            # Use context.bot if available, otherwise use self.bot
-            bot = context.bot if (context is not None and hasattr(context, 'bot')) else self.bot
-            if not bot:
-                logger.error("No bot available in context or self")
-                raise ValueError("Bot not available")
-                
-            # Check if update is valid
-            if not update:
-                logger.error("Update object is None in show_main_menu")
-                raise ValueError("Update not available")
-                
-            # Get user ID and chat ID
-            user_id = update.effective_user.id if update.effective_user else None
-            chat_id = update.effective_chat.id if update.effective_chat else None
+            # Welcome GIF URL
+            gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
             
-            if not user_id or not chat_id:
-                logger.error(f"Invalid user_id ({user_id}) or chat_id ({chat_id})")
-                raise ValueError("User ID or Chat ID not available")
-            
-            logger.info(f"Showing main menu for user {user_id} in chat {chat_id}")
-            
-            # Check if the user has a subscription
-            try:
-                is_subscribed = await self.db.is_user_subscribed(user_id)
-                payment_failed = await self.db.has_payment_failed(user_id)
-                logger.info(f"User subscription: is_subscribed={is_subscribed}, payment_failed={payment_failed}")
-            except Exception as sub_error:
-                logger.error(f"Error checking subscription: {str(sub_error)}")
-                logger.error(traceback.format_exc())
-                # Default to subscribed for error cases
-                is_subscribed = True
-                payment_failed = False
-            
-            if is_subscribed and not payment_failed:
-                # Show the main menu for subscribed users
-                reply_markup = InlineKeyboardMarkup(START_KEYBOARD)
-                
-                # Welcome GIF URL
-                gif_url = "https://media.giphy.com/media/gSzIKNrqtotEYrZv7i/giphy.gif"
-                
-                # If we should show the GIF
-                if not skip_gif:
-                    try:
-                        # For message commands we can use reply_animation
-                        if hasattr(update, 'message') and update.message:
-                            logger.info("Sending animation using message.reply_animation")
-                            # Verwijder eventuele vorige berichten met callback query
-                            if hasattr(update, 'callback_query') and update.callback_query:
-                                try:
-                                    await update.callback_query.message.delete()
-                                    logger.info("Deleted previous callback query message")
-                                except Exception as delete_error:
-                                    logger.warning(f"Could not delete previous message: {str(delete_error)}")
-                            
-                            # Send the GIF using regular animation method
-                            await update.message.reply_animation(
-                                animation=gif_url,
-                                caption=WELCOME_MESSAGE,
-                                parse_mode=ParseMode.HTML,
-                                reply_markup=reply_markup
-                            )
-                            logger.info("Successfully sent animation reply")
-                            return
-                        else:
-                            # Voor callback_query, verwijder huidige bericht en stuur nieuw bericht
-                            if hasattr(update, 'callback_query') and update.callback_query:
-                                logger.info("Handling callback query for menu display")
-                                try:
-                                    # Verwijder het huidige bericht
-                                    await update.callback_query.message.delete()
-                                    logger.info("Deleted current message")
-                                    
-                                    # Stuur nieuw bericht met de welkomst GIF
-                                    await bot.send_animation(
-                                        chat_id=chat_id,
-                                        animation=gif_url,
-                                        caption=WELCOME_MESSAGE,
-                                        parse_mode=ParseMode.HTML,
-                                        reply_markup=reply_markup
-                                    )
-                                    logger.info("Sent new animation message")
-                                    return
-                                except Exception as e:
-                                    logger.error(f"Failed to handle callback query: {str(e)}")
-                                    # Try to edit the message if deletion fails
-                                    try:
-                                        await update.callback_query.edit_message_text(
-                                            text=WELCOME_MESSAGE,
-                                            parse_mode=ParseMode.HTML,
-                                            reply_markup=reply_markup
-                                        )
-                                        logger.info("Edited existing message text")
-                                        return
-                                    except Exception as edit_error:
-                                        logger.error(f"Failed to edit message: {str(edit_error)}")
-                                        # Continue to fallback approaches
-                            else:
-                                # If no message or callback_query, try direct send
-                                logger.info("No message or callback_query, using direct send")
-                                await bot.send_animation(
-                                    chat_id=chat_id,
+            # If we should show the GIF
+            if not skip_gif:
+                try:
+                    # For message commands we can use reply_animation
+                    if hasattr(update, 'message') and update.message:
+                        logger.info("Sending animation using message.reply_animation")
+                        # Verwijder eventuele vorige berichten met callback query
+                        if hasattr(update, 'callback_query') and update.callback_query:
+                            try:
+                                await update.callback_query.message.delete()
+                                logger.info("Deleted previous callback query message")
+                            except Exception as delete_error:
+                                logger.warning(f"Could not delete previous message: {str(delete_error)}")
+                        
+                        # Send the GIF using regular animation method
+                        await update.message.reply_animation(
+                            animation=gif_url,
+                            caption=WELCOME_MESSAGE,
+                            parse_mode=ParseMode.HTML,
+                            reply_markup=reply_markup
+                        )
+                        logger.info("Successfully sent animation reply")
+                        return
+                    else:
+                        # Voor callback_query, verwijder huidige bericht en stuur nieuw bericht
+                        if hasattr(update, 'callback_query') and update.callback_query:
+                            logger.info("Handling callback query for menu display")
+                            try:
+                                # Verwijder het huidige bericht
+                                await update.callback_query.message.delete()
+                                logger.info("Deleted current message")
+                                
+                                # Stuur nieuw bericht met de welkomst GIF
+                                await self.bot.send_animation(
+                                    chat_id=update.effective_chat.id,
                                     animation=gif_url,
                                     caption=WELCOME_MESSAGE,
                                     parse_mode=ParseMode.HTML,
                                     reply_markup=reply_markup
                                 )
-                                logger.info("Sent animation directly")
+                                logger.info("Sent new animation message")
                                 return
-                    except Exception as anim_error:
-                        logger.error(f"Failed to send menu GIF: {str(anim_error)}")
-                        logger.error(traceback.format_exc())
-                        # Fall through to text-only approach
-                
-                # Fallback or skip_gif: try to send text-only message
-                try:
-                    logger.info("Attempting text-only menu display")
-                    if hasattr(update, 'message') and update.message:
-                        await update.message.reply_text(
-                            text=WELCOME_MESSAGE,
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=reply_markup
-                        )
-                        logger.info("Sent text reply to message")
-                    else:
-                        await bot.send_message(
-                            chat_id=chat_id,
-                            text=WELCOME_MESSAGE,
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=reply_markup
-                        )
-                        logger.info("Sent text message directly")
-                except Exception as text_error:
-                    logger.error(f"Failed to send text menu: {str(text_error)}")
+                            except Exception as e:
+                                logger.error(f"Failed to handle callback query: {str(e)}")
+                                # Try to edit the message if deletion fails
+                                try:
+                                    await update.callback_query.edit_message_text(
+                                        text=WELCOME_MESSAGE,
+                                        parse_mode=ParseMode.HTML,
+                                        reply_markup=reply_markup
+                                    )
+                                    logger.info("Edited existing message text")
+                                    return
+                                except Exception as edit_error:
+                                    logger.error(f"Failed to edit message: {str(edit_error)}")
+                                    # Continue to fallback approaches
+                        else:
+                            # If no message or callback_query, try direct send
+                            logger.info("No message or callback_query, using direct send")
+                            await self.bot.send_animation(
+                                chat_id=update.effective_chat.id,
+                                animation=gif_url,
+                                caption=WELCOME_MESSAGE,
+                                parse_mode=ParseMode.HTML,
+                                reply_markup=reply_markup
+                            )
+                            logger.info("Sent animation directly")
+                            return
+                except Exception as anim_error:
+                    logger.error(f"Failed to send menu GIF: {str(anim_error)}")
                     logger.error(traceback.format_exc())
-                    # One last attempt with simplified message
-                    try:
-                        await bot.send_message(
-                            chat_id=chat_id,
-                            text="Main Menu",
-                            reply_markup=reply_markup
-                        )
-                        logger.info("Sent simplified text menu")
-                    except Exception as last_error:
-                        logger.error(f"All menu display attempts failed: {str(last_error)}")
-            else:
-                # Handle non-subscribed users or payment failed
-                logger.info(f"User not subscribed or payment failed. Redirecting to start command")
-                await self.start_command(update, context)
-        except Exception as e:
-            logger.error(f"Critical error in show_main_menu: {str(e)}")
-            logger.error(traceback.format_exc())
+                    # Fall through to text-only approach
             
-            # Last resort fallback - try to send a minimal menu
+            # Fallback or skip_gif: try to send text-only message
             try:
-                chat_id = update.effective_chat.id if update and update.effective_chat else None
-                if chat_id and self.bot:
-                    keyboard = [
-                        [InlineKeyboardButton("📊 Analysis", callback_data="menu_analyse")],
-                        [InlineKeyboardButton("📈 Signals", callback_data="menu_signals")]
-                    ]
+                logger.info("Attempting text-only menu display")
+                if hasattr(update, 'message') and update.message:
+                    await update.message.reply_text(
+                        text=WELCOME_MESSAGE,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup
+                    )
+                    logger.info("Sent text reply to message")
+                else:
                     await self.bot.send_message(
-                        chat_id=chat_id,
-                        text="Emergency Fallback Menu",
-                        reply_markup=InlineKeyboardMarkup(keyboard)
+                        chat_id=update.effective_chat.id,
+                        text=WELCOME_MESSAGE,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup
                     )
-                    logger.info("Sent emergency fallback menu")
-            except Exception as final_error:
-                logger.error(f"Emergency fallback failed: {str(final_error)}")
-
-        user = update.effective_user
-        chat_id = update.effective_chat.id
-        
-        # Check if the bot can send messages to this user (e.g. user hasn't blocked the bot)
-        # This is a general check, might not be strictly necessary here if other commands work
-        try:
-            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-        except Exception as e:
-            logger.error(f"Failed to send chat action to {chat_id}: {e}. User might have blocked the bot.")
-            # If user blocked the bot, we can't proceed. Silently fail or log.
-            return ConversationHandler.END # Or some other terminal state or action
-
-        # GIF logic (simplified)
-        gif_url = None
-        if not skip_gif and self.config.get("ENABLE_GIFS", False): # Check config for ENABLE_GIFS
-            # Add your GIF selection logic here if needed
-            # gif_url = random.choice(self.config.get("WELCOME_GIFS", [])) # Assuming WELCOME_GIFS in config
-            pass
-
-
-        keyboard = InlineKeyboardMarkup(START_KEYBOARD)
-        welcome_text = WELCOME_MESSAGE # Make sure WELCOME_MESSAGE is defined
-
-        query = update.callback_query
-        if query:
-            await query.answer()
-            try:
-                if gif_url:
-                    await query.edit_message_media(media=InputMediaAnimation(gif_url), reply_markup=keyboard)
-                    # Telegram requires a caption for media, send text separately or ensure WELCOME_MESSAGE is caption
-                    await query.message.reply_text(text=welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-
-                else:
-                    await query.edit_message_text(
-                        text=welcome_text,
-                        reply_markup=keyboard,
-                        parse_mode=ParseMode.HTML
+                    logger.info("Sent text message directly")
+            except Exception as text_error:
+                logger.error(f"Failed to send text menu: {str(text_error)}")
+                logger.error(traceback.format_exc())
+                # One last attempt with simplified message
+                try:
+                    await self.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Main Menu",
+                        reply_markup=reply_markup
                     )
-            except BadRequest as e:
-                if "message is not modified" in str(e).lower():
-                    logger.info("Menu message not modified, no change needed.")
-                elif "message to edit not found" in str(e).lower():
-                    logger.warning("Message to edit for main menu not found. Sending new one.")
-                    if update.effective_chat:
-                        if gif_url:
-                             await context.bot.send_animation(chat_id=update.effective_chat.id, animation=gif_url, caption=welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-                        else:
-                            await context.bot.send_message(chat_id=update.effective_chat.id, text=welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-                else:
-                    logger.error(f"Error editing main menu message: {e}")
-                    # Fallback: send a new message
-                    if update.effective_chat: # Ensure effective_chat exists
-                        if gif_url:
-                             await context.bot.send_animation(chat_id=update.effective_chat.id, animation=gif_url, caption=welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-                        else:
-                            await context.bot.send_message(chat_id=update.effective_chat.id, text=welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-
-        elif update.message: # For /menu or /start command
-            if gif_url:
-                await update.message.reply_animation(animation=gif_url, caption=welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-            else:
-                await update.message.reply_text(
-                    text=welcome_text,
-                    reply_markup=keyboard,
-                    parse_mode=ParseMode.HTML
-                )
-                
-        return MENU # Crucial: ensure show_main_menu also returns the target state if it's a handler
+                    logger.info("Sent simplified text menu")
+                except Exception as last_error:
+                    logger.error(f"All menu display attempts failed: {str(last_error)}")
+        else:
+            # Handle non-subscribed users or payment failed
+            logger.info(f"User not subscribed or payment failed. Redirecting to start command")
+            await self.start_command(update, context)
 
     async def analysis_technical_callback(self, update: Update, context=None) -> int:
         """Handle analysis_technical button press"""
@@ -3389,7 +3292,7 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
                 if from_signal_flow:
                     # Replace back button with back to signal
                     keyboard[-1] = [
-                        InlineKeyboardButton("⬅️ Back to Signal", callback_data="back_signal"),
+                        InlineKeyboardButton("⬅️ Back", callback_data="back_signal"),
                         InlineKeyboardButton("🏠 Home", callback_data="menu")
                     ]
                 
