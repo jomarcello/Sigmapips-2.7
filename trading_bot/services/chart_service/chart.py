@@ -109,8 +109,9 @@ class ChartService:
             self.chart_links = {
                 # Commodities
                 "XAUUSD": "https://www.tradingview.com/chart/bylCuCgc/",
-                "XTIUSD": "https://www.tradingview.com/chart/zmsuvPgj/",  # Bijgewerkte link voor Oil
-                "USOIL": "https://www.tradingview.com/chart/zmsuvPgj/",  # Dezelfde link als Oil
+                "XTIUSD": "https://www.tradingview.com/chart/PWcfBU0O/",  # Nieuwe link voor Oil
+                "USOIL": "https://www.tradingview.com/chart/PWcfBU0O/",  # Nieuwe link voor Oil
+                "XAGUSD": "https://www.tradingview.com/chart/PWcfBU0O/",  # Nieuwe link voor Silver
                 
                 # Currencies
                 "EURUSD": "https://www.tradingview.com/chart/zmsuvPgj/",  # Bijgewerkte link voor EURUSD
