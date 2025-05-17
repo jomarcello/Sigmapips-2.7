@@ -56,6 +56,7 @@ class EnhancedTradingView:
         # Crypto
         "BTCUSD": ("crypto", "BINANCE"),
         "ETHUSD": ("crypto", "BINANCE"),
+        "XRPUSD": ("crypto", "BINANCE", "XRPUSDT"),
     }
 
     @staticmethod

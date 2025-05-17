@@ -79,6 +79,7 @@ class TradingViewProvider:
         # Crypto
         "BTCUSD": ("BTCUSD", "crypto", "BINANCE"),
         "ETHUSD": ("ETHUSD", "crypto", "BINANCE"),
+        "XRPUSD": ("XRPUSDT", "crypto", "BINANCE"),
     }
 
     @staticmethod
