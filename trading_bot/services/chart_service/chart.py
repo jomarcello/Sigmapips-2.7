@@ -1056,21 +1056,21 @@ class ChartService:
             # Format instrument name to match Yahoo Finance/TradingView style
             display_name = instrument
             if instrument == "XAUUSD":
-                display_name = "Gold"
+                display_name = "Gold (GC=F)"
             elif instrument == "XTIUSD" or instrument == "USOIL":
-                display_name = "Crude Oil"
+                display_name = "Crude Oil (CL=F)"
             elif instrument == "XAGUSD":
-                display_name = "Silver"
+                display_name = "Silver (SI=F)"
             elif instrument == "US500":
-                display_name = "S&P 500"
+                display_name = "S&P 500 (^GSPC)"
             elif instrument == "US30":
-                display_name = "Dow Jones"
+                display_name = "Dow Jones (^DJI)"
             elif instrument == "US100":
-                display_name = "Nasdaq"
+                display_name = "Nasdaq (^IXIC)"
             elif instrument == "DE40":
-                display_name = "DAX"
+                display_name = "DAX (^GDAXI)"
             elif instrument == "UK100":
-                display_name = "FTSE 100"
+                display_name = "FTSE 100 (^FTSE)"
             
             # Format price with appropriate precision
             precision = self._get_instrument_precision(instrument)
@@ -1219,8 +1219,11 @@ class ChartService:
             weekly_high_formatted = f"{weekly_high:,.{precision}f}" if weekly_high is not None else "N/A"
             weekly_low_formatted = f"{weekly_low:,.{precision}f}" if weekly_low is not None else "N/A"
             
+            # Remove any ticker symbol in parentheses from display name for the output
+            clean_display_name = re.sub(r'\s*\([^)]+\)', '', display_name)
+            
             # Generate analysis text
-            analysis = f"""{display_name} Analysis
+            analysis = f"""{clean_display_name} Analysis
 
 Zone Strength: {strength_stars}
 
