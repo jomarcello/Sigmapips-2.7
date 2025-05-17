@@ -39,11 +39,13 @@ class EnhancedTradingView:
         "USDCAD": ("forex", "FX_IDC"),
         "USDCHF": ("forex", "FX_IDC"),
         "NZDUSD": ("forex", "FX_IDC"),
-        # Commodities
-        "XAUUSD": ("cfd", "TVC", "GOLD"),  # Gold op TVC
-        "XAGUSD": ("cfd", "TVC", "SILVER"),  # Silver op TVC
-        "XTIUSD": ("cfd", "TVC", "USOIL"),  # WTI Olie op TVC
-        "XBRUSD": ("cfd", "TVC", "UKOIL"),  # Brent Olie op TVC
+        # Commodities - Using different formats for TradingView compatibility
+        "XAUUSD": ("cfd", "TVC", "GOLD"),       # Gold on TVC
+        "XAGUSD": ("cfd", "TVC", "SILVER"),     # Silver on TVC
+        "XTIUSD": ("cfd", "TVC", "USOIL"),      # WTI Oil on TVC
+        "USOIL": ("cfd", "TVC", "USOIL"),       # Explicit WTI Oil mapping
+        "WTICL": ("america", "NYMEX", "CL1!"),  # WTI Crude Oil Futures alternative
+        "XBRUSD": ("cfd", "TVC", "UKOIL"),      # Brent Oil on TVC
         # Aandelen
         "AAPL": ("america", "NASDAQ"),
         "MSFT": ("america", "NASDAQ"),

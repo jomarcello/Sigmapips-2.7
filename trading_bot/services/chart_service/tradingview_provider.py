@@ -62,11 +62,13 @@ class TradingViewProvider:
         "USDCAD": ("USDCAD", "forex", "FX_IDC"),
         "USDCHF": ("USDCHF", "forex", "FX_IDC"),
         "NZDUSD": ("NZDUSD", "forex", "FX_IDC"),
-        # Commodities
-        "XAUUSD": ("GOLD", "cfd", "TVC"),  # Gold op TVC
-        "XAGUSD": ("SILVER", "cfd", "TVC"),  # Silver op TVC
-        "XTIUSD": ("USOIL", "cfd", "TVC"),  # WTI Olie op TVC
-        "XBRUSD": ("UKOIL", "cfd", "TVC"),  # Brent Olie op TVC
+        # Commodities - Using different formats for TradingView compatibility
+        "XAUUSD": ("GOLD", "cfd", "TVC"),       # Gold on TVC
+        "XAGUSD": ("SILVER", "cfd", "TVC"),     # Silver on TVC 
+        "XTIUSD": ("USOIL", "cfd", "TVC"),      # WTI Oil on TVC
+        "USOIL": ("USOIL", "cfd", "TVC"),       # Explicit WTI Oil mapping
+        "WTICL": ("CL1!", "america", "NYMEX"),  # WTI Crude Oil Futures alternative
+        "XBRUSD": ("UKOIL", "cfd", "TVC"),      # Brent Oil on TVC
         # Aandelen
         "AAPL": ("AAPL", "america", "NASDAQ"),
         "MSFT": ("MSFT", "america", "NASDAQ"),
