@@ -1371,7 +1371,7 @@ class TelegramService:
             # Save the signal data to the user's directory
             signal_path = os.path.join(user_signal_dir, f"{signal_id}.json")
             with open(signal_path, 'w') as f:
-                json.dump(signal_data, f)
+                json.dump(signal_data, f, indent=4)
                 
             logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
@@ -4730,118 +4730,70 @@ To continue using Sigmapips AI and receive trading signals, please reactivate yo
             # Save the signal data to the user's directory
             signal_path = os.path.join(user_signal_dir, f"{signal_id}.json")
             with open(signal_path, 'w') as f:
-                json.dump(signal_data, f)
+                json.dump(signal_data, f, indent=4)
                 
             logger.info(f"Saved signal for user {user_id}: {signal_path}")
         except Exception as e:
             logger.error(f"Error saving user signal: {str(e)}")
 
     async def _load_signals(self):
-        """Load stored signals from the database"""
-        try:
-            self.logger.info("Loading stored signals")
-            
-            # Initialize signals container
-            self.user_signals = {}
-            
-            # 1. First try to load from database
-            try:
-                # Check if the get_active_signals method exists on the database object
-                if hasattr(self.db, 'get_active_signals'):
-                    signals = await self.db.get_active_signals()
-                    self.logger.info(f"Found {len(signals)} active signals")
-                    
-                    # Process each signal
-                    for signal in signals:
-                        # Check necessary fields
-                        if 'user_id' in signal and 'market' in signal and 'instrument' in signal:
-                            user_id = signal['user_id']
-                            market = signal['market']
-                            instrument = signal['instrument']
-                            
-                            # Add to user_signals dictionary
-                            if user_id not in self.user_signals:
-                                self.user_signals[user_id] = {}
-                            if market not in self.user_signals[user_id]:
-                                self.user_signals[user_id][market] = []
-                            
-                            # Add instrument if not already in list
-                            if instrument not in self.user_signals[user_id][market]:
-                                self.user_signals[user_id][market].append(instrument)
-                else:
-                    self.logger.warning("Database does not have get_active_signals method - signals won't be loaded")
-            except AttributeError:
-                self.logger.warning("Database missing get_active_signals method - falling back to empty signals")
-            
-            # 2. Load from file system (more reliable for persistence)
-            signals_loaded = 0
-                
-            # Check the user signals directory
-            if os.path.exists(self.user_signals_dir):
-                # Iterate through each user directory
-                for user_id in os.listdir(self.user_signals_dir):
-                    user_dir = os.path.join(self.user_signals_dir, user_id)
-                    
-                    # Skip if not a directory
-                    if not os.path.isdir(user_dir):
-                        continue
-                        
-                    # Initialize user dict if needed
-                    if user_id not in self.user_signals:
-                        self.user_signals[user_id] = {}
-                    
-                    # Load each signal file for this user
-                    for signal_file in os.listdir(user_dir):
-                        if signal_file.endswith('.json'):
-                            signal_path = os.path.join(user_dir, signal_file)
-                            
+        self.logger.info("Attempting to load signals from file system...")
+        self.user_signals = {}  # Initialize/clear existing
+
+        # 1. Load from user-specific file storage
+        if os.path.exists(self.user_signals_dir):
+            for user_id_str in os.listdir(self.user_signals_dir):
+                user_dir_path = os.path.join(self.user_signals_dir, user_id_str)
+                if os.path.isdir(user_dir_path):
+                    if user_id_str not in self.user_signals:
+                        self.user_signals[user_id_str] = {}
+                    for filename in os.listdir(user_dir_path):
+                        if filename.endswith(".json"):
+                            signal_id = filename[:-5]  # Remove .json extension
+                            file_path = os.path.join(user_dir_path, filename)
                             try:
-                                with open(signal_path, 'r') as f:
+                                with open(file_path, 'r') as f:
                                     signal_data = json.load(f)
-                                    
-                                if 'id' in signal_data:
-                                    signal_id = signal_data['id']
-                                    self.user_signals[user_id][signal_id] = signal_data
-                                    signals_loaded += 1
-                            except Exception as file_error:
-                                self.logger.warning(f"Error loading signal file {signal_path}: {str(file_error)}")
-            
-            # 3. Check central signals directory as fallback
-            if os.path.exists(self.signals_dir):
-                central_signals_loaded = 0
-                
-                # Find json files in the signals directory
-                for signal_file in os.listdir(self.signals_dir):
-                    if signal_file.endswith('.json') and os.path.isfile(os.path.join(self.signals_dir, signal_file)):
-                        signal_path = os.path.join(self.signals_dir, signal_file)
+                                self.user_signals[user_id_str][signal_id] = signal_data
+                                self.logger.debug(f"Loaded signal {signal_id} for user {user_id_str} from {file_path}")
+                            except json.JSONDecodeError as jde:
+                                self.logger.error(f"JSONDecodeError loading signal file {file_path}: {jde}. File content might be corrupted or empty.")
+                            except Exception as e:
+                                self.logger.error(f"Error loading signal file {file_path}: {e}")
+        else:
+            self.logger.info(f"User signals directory not found: {self.user_signals_dir}. Skipping loading user-specific signals.")
+
+        # 2. Load from central file storage (as a fallback, primarily for admins or if not user-specific)
+        if os.path.exists(self.signals_dir):
+            for filename in os.listdir(self.signals_dir):
+                if filename.endswith(".json"):
+                    signal_id = filename[:-5]  # Remove .json extension
+                    file_path = os.path.join(self.signals_dir, filename)
+                    try:
+                        with open(file_path, 'r') as f:
+                            signal_data = json.load(f)
                         
-                        try:
-                            with open(signal_path, 'r') as f:
-                                signal_data = json.load(f)
-                                
-                            if 'id' in signal_data:
-                                central_signals_loaded += 1
-                                
-                                # Store in admin user signals as fallback
-                                for admin_id in self.admin_users:
-                                    admin_id_str = str(admin_id)
-                                    if admin_id_str not in self.user_signals:
-                                        self.user_signals[admin_id_str] = {}
-                                        
-                                    self.user_signals[admin_id_str][signal_data['id']] = signal_data
-                        except Exception as file_error:
-                            self.logger.warning(f"Error loading central signal file {signal_path}: {str(file_error)}")
-                
-                self.logger.info(f"Loaded {central_signals_loaded} signals from central storage")
-                        
-            self.logger.info(f"Loaded {signals_loaded} signals from file system for {len(self.user_signals)} users")
-            self.logger.info("Signals loaded")
-                
-        except Exception as e:
-            self.logger.error(f"Error loading signals: {str(e)}")
-            self.logger.exception(e)
-            # Initialize empty user_signals dict in case of error
-            self.user_signals = {}
+                        # Add to admin users if not already loaded for them from their specific directory
+                        # Also, could be a general fallback if a signal_id is requested and not found under a specific user.
+                        # For now, load them into admin users' signals, avoiding overwrite if already present.
+                        if hasattr(self, 'admin_users') and self.admin_users:
+                            for admin_id in self.admin_users:
+                                admin_str_id = str(admin_id)
+                                if admin_str_id not in self.user_signals:
+                                    self.user_signals[admin_str_id] = {}
+                                # Only add if this signal_id isn't already loaded for the admin
+                                # This prioritizes user-specific signals if they exist
+                                if signal_id not in self.user_signals[admin_str_id]:
+                                    self.user_signals[admin_str_id][signal_id] = signal_data
+                                    self.logger.debug(f"Loaded central signal {signal_id} from {file_path} for admin {admin_str_id}.")
+                    except json.JSONDecodeError as jde:
+                        self.logger.error(f"JSONDecodeError loading central signal file {file_path}: {jde}. File content might be corrupted or empty.")
+                    except Exception as e:
+                        self.logger.error(f"Error loading central signal file {file_path}: {e}")
+        else:
+            self.logger.info(f"Central signals directory not found: {self.signals_dir}. Skipping loading central signals.")
+        
+        self.logger.info(f"Signal loading from files complete. Total users with signals in memory: {len(self.user_signals)}")
 
     async def back_signals_callback(self, update: Update, context=None) -> int:
         """Handle back_signals button press"""
