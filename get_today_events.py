@@ -115,18 +115,19 @@ async def main():
     # Fetch data from ForexFactory
     events = await fetch_forexfactory_data()
     
-    if not events:
-        print("No events found or error fetching data. Using sample data for testing.")
-        # Provide some sample data to avoid empty calendar
-        events = [
-            {"time": "8:30am", "currency": "USD", "impact": "High", "event": "Non-Farm Payrolls", "forecast": "175K", "previous": "187K", "actual": ""},
-            {"time": "9:00am", "currency": "EUR", "impact": "Medium", "event": "ECB President Speaks", "forecast": "", "previous": "", "actual": ""},
-            {"time": "10:00am", "currency": "GBP", "impact": "Low", "event": "Manufacturing PMI", "forecast": "51.2", "previous": "50.8", "actual": ""}
-        ]
-    
     # Get date string for output filename
     date_str = current_time.strftime("%Y-%m-%d")
     output_filename = f"forex_factory_data_{date_str}.json"
+    
+    if not events:
+        print("No economic events found today (weekend or holiday).")
+        
+        # Save empty array to JSON file
+        with open(output_filename, 'w') as f:
+            json.dump([], f, indent=2)
+        
+        print(f"Saved empty event list to {output_filename}")
+        return
     
     # Save to JSON file
     with open(output_filename, 'w') as f:

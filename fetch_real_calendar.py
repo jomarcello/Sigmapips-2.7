@@ -256,62 +256,45 @@ async def main():
     # Fetch real-time economic calendar data
     events = await fetch_forexfactory_calendar()
     
+    # Create output directory if it doesn't exist
+    output_dir = os.path.dirname("real_forex_factory_data.json")
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Get current date
+    current_date = datetime.now(pytz.timezone('Asia/Singapore')).strftime("%Y-%m-%d")
+    
+    # Format and display events
     if not events:
-        print("⚠️ No economic events found or error occurred. Using fallback sample data.")
-        # Provide fallback sample data
-        events = [
-            {
-                "time": "8:30am", 
-                "currency": "USD", 
-                "currency_flag": "🇺🇸",
-                "impact": "High", 
-                "impact_emoji": "🔴",
-                "event": "Non-Farm Payrolls", 
-                "forecast": "175K", 
-                "previous": "187K", 
-                "actual": ""
-            },
-            {
-                "time": "10:00am", 
-                "currency": "EUR", 
-                "currency_flag": "🇪🇺",
-                "impact": "Medium", 
-                "impact_emoji": "🟠",
-                "event": "ECB President Speaks", 
-                "forecast": "", 
-                "previous": "", 
-                "actual": ""
-            },
-            {
-                "time": "2:00pm", 
-                "currency": "GBP", 
-                "currency_flag": "🇬🇧",
-                "impact": "Low", 
-                "impact_emoji": "🟡",
-                "event": "Manufacturing PMI", 
-                "forecast": "51.2", 
-                "previous": "50.8", 
-                "actual": ""
-            }
-        ]
+        print(f"\n📅 ECONOMIC CALENDAR FOR {current_date}")
+        print("="*80)
+        print("\nℹ️ No economic events today (weekend or holiday).")
+        
+        # Save empty list to JSON
+        with open("real_forex_factory_data.json", "w") as f:
+            json.dump([], f, indent=2)
+            
+        # Update calendar service data file as well
+        with open(f"forex_factory_data_{current_date}.json", "w") as f:
+            json.dump([], f, indent=2)
+            
+        print(f"\n✅ Saved empty event list to real_forex_factory_data.json")
+        print(f"✅ Updated calendar service data file: forex_factory_data_{current_date}.json")
+        return
     
-    # Format and display the events
-    formatted_output = format_event_list(events)
-    print(formatted_output)
+    # If we have events, format them for display    
+    formatted_calendar = format_event_list(events)
     
-    # Save to JSON file
-    with open('real_forex_factory_data.json', 'w', encoding='utf-8') as f:
+    # Save to JSON for API use
+    with open("real_forex_factory_data.json", "w") as f:
         json.dump(events, f, indent=2)
-    
-    print(f"\n✅ Saved {len(events)} economic events to real_forex_factory_data.json")
-    
-    # Update the calendar service's data file as well
-    today = datetime.now(pytz.timezone('Asia/Singapore')).strftime("%Y-%m-%d")
-    ff_data_file = f"forex_factory_data_{today}.json"
-    with open(ff_data_file, 'w', encoding='utf-8') as f:
+        
+    # Also save in format used by calendar service
+    with open(f"forex_factory_data_{current_date}.json", "w") as f:
         json.dump(events, f, indent=2)
-    
-    print(f"✅ Updated calendar service data file: {ff_data_file}")
+        
+    print(f"✅ Saved {len(events)} economic events to real_forex_factory_data.json")
+    print(f"✅ Updated calendar service data file: forex_factory_data_{current_date}.json")
 
 if __name__ == "__main__":
     asyncio.run(main()) 
