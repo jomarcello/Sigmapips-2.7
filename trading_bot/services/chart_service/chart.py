@@ -577,7 +577,7 @@ class ChartService:
                         
                         for selector in indicator_selectors:
                             try:
-                                await page.wait_for_selector(selector, timeout=500)
+                                await page.wait_for_selector(selector, timeout=250)
                                 logger.info(f"Found indicator element: {selector}")
                                 break
                             except Exception as ind_e:
