@@ -78,6 +78,7 @@ class TradingViewProvider:
         "US500": ("SPX500", "america", "CBOE"),  # S&P 500 index via CBOE
         "NAS100": ("NDX", "america", "NASDAQ"),  # Nasdaq 100 index
         "US30": ("DJI", "america", "DJ"),        # Dow Jones index
+        "US100": ("NDX", "america", "NASDAQ"),   # NASDAQ 100 index (added for US100 compatibility)
         # Crypto
         "BTCUSD": ("BTCUSD", "crypto", "BINANCE"),
         "ETHUSD": ("ETHUSD", "crypto", "BINANCE"),

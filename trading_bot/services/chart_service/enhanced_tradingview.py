@@ -55,6 +55,7 @@ class EnhancedTradingView:
         "US500": ("america", "CBOE", "SPX500"),  # S&P 500 index via CBOE
         "NAS100": ("america", "NASDAQ", "NDX"),  # Nasdaq 100 index
         "US30": ("america", "DJ", "DJI"),        # Dow Jones index
+        "US100": ("america", "NASDAQ", "NDX"),   # NASDAQ 100 index (added for US100 compatibility)
         # Crypto
         "BTCUSD": ("crypto", "BINANCE"),
         "ETHUSD": ("crypto", "BINANCE"),
