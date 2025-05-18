@@ -52,7 +52,7 @@ class EnhancedTradingView:
         "GOOGL": ("america", "NASDAQ"),
         "AMZN": ("america", "NASDAQ"),
         # Indices - note: technische analyse voor indices is niet ondersteund door TradingView
-        "US500": ("america", "CBOE", "SPX500"),  # S&P 500 index via CBOE
+        "US500": ("america", "CBOE", "SPX"),  # S&P 500 index via CBOE - Changed SPX500 to SPX
         "NAS100": ("america", "NASDAQ", "NDX"),  # Nasdaq 100 index
         "US30": ("america", "DJ", "DJI"),        # Dow Jones index
         "US100": ("america", "NASDAQ", "NDX"),   # NASDAQ 100 index (added for US100 compatibility)
