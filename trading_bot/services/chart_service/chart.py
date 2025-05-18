@@ -577,7 +577,7 @@ class ChartService:
                         
                         for selector in indicator_selectors:
                             try:
-                                await page.wait_for_selector(selector, timeout=2000)
+                                await page.wait_for_selector(selector, timeout=1000)
                                 logger.info(f"Found indicator element: {selector}")
                                 break
                             except Exception as ind_e:
@@ -588,7 +588,7 @@ class ChartService:
                     
                     # Give time for chart to fully render
                     logger.info("Waiting for indicators to fully render...")
-                    await page.wait_for_timeout(3000)
+                    await page.wait_for_timeout(1000)
                     
                     # Try to go fullscreen
                     try:
