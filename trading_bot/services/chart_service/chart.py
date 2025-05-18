@@ -560,7 +560,7 @@ class ChartService:
                         # Try different selectors
                         for selector in ['.chart-container', '.chart-markup-table', '.price-axis', '.chart-widget']:
                             try:
-                                await page.wait_for_selector(selector, timeout=10000)
+                                await page.wait_for_selector(selector, timeout=5000)
                                 logger.info(f"Found chart element: {selector}")
                                 break
                             except:
@@ -593,7 +593,7 @@ class ChartService:
                     # Try to go fullscreen
                     try:
                         await page.keyboard.press("Shift+F")
-                        await page.wait_for_timeout(1000)
+                        await page.wait_for_timeout(500)
                     except:
                         logger.warning("Couldn't enter fullscreen, continuing anyway")
                     
